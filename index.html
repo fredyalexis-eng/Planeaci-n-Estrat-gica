@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANI · PEI 2027–2030 · Copiloto Estratégico Interactivo</title>
+<style>
+:root{
+  --navy:#0B2C4A; --navy2:#123A5E; --teal:#0E9B9B; --teal-d:#0B7A7A; --amber:#F2A900; --amber-d:#C78A00;
+  --bg:#F4F6F8; --card:#fff; --line:#DCE3EA; --ink:#16202B; --mut:#5A6B7C; --ok:#0E9B6B; --warn:#E8A100; --bad:#D64545;
+  --r:14px; --sh:0 6px 24px rgba(11,44,74,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+a{color:var(--teal-d)}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit;font-size:14px}
+:focus-visible{outline:3px solid rgba(14,155,155,.45);outline-offset:2px}
+
+/* HEADER */
+header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;padding:14px 18px;position:sticky;top:0;z-index:50;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.hwrap{max-width:1240px;margin:0 auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.logo{width:44px;height:44px;border-radius:10px;background:#fff;color:var(--navy);display:grid;place-items:center;font-weight:900;font-size:15px;letter-spacing:.03em;flex:0 0 auto}
+.htitle{flex:1;min-width:220px}
+.htitle h1{margin:0;font-size:18px;letter-spacing:.02em}
+.htitle p{margin:2px 0 0;font-size:12px;opacity:.85}
+.hactions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid transparent;border-radius:10px;padding:9px 13px;font-weight:700;font-size:13px;transition:.15s}
+.btn:active{transform:translateY(1px)}
+.btn-white{background:#fff;color:var(--navy)}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-teal:hover{background:var(--teal-d)}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-light{background:#fff;border-color:var(--line);color:var(--navy)}
+.btn-danger{background:#fff;border-color:#F0CACA;color:var(--bad)}
+.btn-sm{padding:6px 10px;font-size:12px;border-radius:8px}
+.save{font-size:12px;opacity:.9;background:rgba(255,255,255,.12);padding:7px 10px;border-radius:999px}
+.progressbar{height:8px;background:rgba(255,255,255,.18);border-radius:999px;overflow:hidden;min-width:140px;flex:1}
+.progressbar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--amber));width:0%;transition:width .5s}
+
+/* STEPS */
+.steps{max-width:1240px;margin:14px auto 0;padding:0 14px;display:flex;gap:8px;flex-wrap:wrap}
+.step{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;text-align:left;transition:.15s}
+.step:hover{border-color:var(--teal)}
+.step.active{border-color:var(--navy);box-shadow:var(--sh)}
+.step .n{width:30px;height:30px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-weight:900;font-size:13px;color:var(--navy);flex:0 0 auto}
+.step.active .n{background:var(--navy);color:#fff}
+.step.done .n{background:var(--ok);color:#fff}
+.step b{font-size:13px;display:block}
+.step span{font-size:11px;color:var(--mut)}
+
+main{max-width:1240px;margin:0 auto;padding:14px 14px 40px}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin:14px 0}
+.card h2{margin:0 0 6px;color:var(--navy);font-size:18px}
+.card h3{margin:14px 0 8px;color:var(--navy);font-size:15px}
+.mut{color:var(--mut);font-size:13px;line-height:1.55}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+.foco{border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.foco .bar{height:8px}.bar-teal{background:var(--teal)}.bar-amber{background:var(--amber)}
+.foco h3{margin:0;padding:12px 14px;background:var(--bg);font-size:14px}
+.foco p{padding:10px 14px;margin:0;font-size:13px;line-height:1.55}
+.stat{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}
+.stat b{font-size:28px;color:var(--navy);display:block}
+.stat span{font-size:12px;color:var(--mut)}
+.pill{display:inline-block;font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:#fff}
+.pill.ok{background:#E7F6EF;border-color:#BFE8D2;color:#0B6B4A}
+.pill.warn{background:#FFF4D6;border-color:#F2D98C;color:#7A5A00}
+.pill.bad{background:#FDECEC;border-color:#F3C2C2;color:#8B1E1E}
+.pill.teal{background:#E6F5F5;border-color:#BFE8E8;color:#0B5F5F}
+.pill.amber{background:#FFF4D6;border-color:#F2D98C;color:#7A5A00}
+.pill.navy{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* FORMS */
+label{font-size:12px;font-weight:800;color:var(--navy);display:block;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=date],input[type=number],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}
+textarea{min-height:90px;resize:vertical;line-height:1.5}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+.hint{font-size:12px;color:var(--mut);margin-top:6px;line-height:1.5}
+.listrow{display:flex;gap:8px;margin:8px 0}
+.listrow input{flex:1}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-weight:800;font-size:13px;color:var(--navy)}
+.tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tab .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#CBD5E1;margin-right:6px;vertical-align:middle}
+.tab .dot.ok{background:var(--ok)}
+details{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;background:#FAFBFC}
+summary{cursor:pointer;font-weight:800;color:var(--navy);font-size:13px}
+details ul{margin:8px 0 4px;padding-left:18px;font-size:13px;line-height:1.6;color:var(--mut)}
+
+/* PROJECTS */
+.proj{border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;background:#fff}
+.proj-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proj-head b{font-size:15px;color:var(--navy)}
+.proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:800px){.proj-grid{grid-template-columns:1fr}}
+.score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:800px){.score-grid{grid-template-columns:1fr 1fr}}
+.score{border:1px solid var(--line);border-radius:10px;padding:10px;background:#FAFBFC}
+.score b{font-size:12px;color:var(--navy);display:block;margin-bottom:6px}
+.score input[type=range]{width:100%}
+.score output{font-weight:900;color:var(--navy)}
+.checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.toolbar select{width:auto;min-width:180px}
+.matrix-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quad{border:2px dashed var(--line);border-radius:12px;padding:12px;min-height:130px;background:#FAFBFC}
+.quad h4{margin:0 0 8px;color:var(--navy);font-size:13px}
+.chip{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 9px;font-size:12px;margin:3px 2px}
+.timer{font-size:34px;font-weight:900;color:var(--navy);letter-spacing:.03em}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1}
+footer{max-width:1240px;margin:0 auto;padding:0 14px 30px;color:var(--mut);font-size:12px;line-height:1.6}
+.kbd{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:12px}
+@media print{header,.steps,.toolbar,.no-print{display:none!important} .view{display:none!important} #view-summary{display:block!important} body{background:#fff}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="logo">ANI</div>
+    <div class="htitle">
+      <h1>PEI 2027–2030 · Copiloto Estratégico Interactivo</h1>
+      <p>Ejercicio dinámico en línea · 2 Focos (Iniciativas PND) · Documentos → Proyectos → Priorización → Resumen</p>
+    </div>
+    <div class="progressbar" title="Avance del ejercicio"><i id="globalBar"></i></div>
+    <div class="hactions">
+      <span class="save" id="saveStatus">Guardado local · —</span>
+      <button class="btn btn-ghost btn-sm" onclick="exportJSON()">Exportar JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Exportar CSV</button>
+      <button class="btn btn-white btn-sm" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+  </div>
+</header>
+
+<nav class="steps" id="stepsNav" aria-label="Pasos del ejercicio"></nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+    <div class="card">
+      <h2>Panel ejecutivo</h2>
+      <p class="mut">Todo lo que diligencias se guarda <b>automáticamente en este navegador</b> (localStorage). No sale a internet, no requiere cuenta. Exporta cuando quieras. Si no hay dato en el documento, escribe <b>“Información insuficiente para concluir”</b> — nunca inventes.</p>
+      <div class="grid4" style="margin-top:12px">
+        <div class="stat"><b id="stDocs">0/4</b><span>Documentos con relación ANI completa</span></div>
+        <div class="stat"><b id="stProj">0</b><span>Proyectos en la tabla PEI</span></div>
+        <div class="stat"><b id="stValid">0</b><span>Filas validadas (6 columnas + scoring)</span></div>
+        <div class="stat"><b id="stPct">0%</b><span>Avance global del ejercicio</span></div>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-teal" onclick="go('docs')">1 · Revisar documentos</button>
+        <button class="btn btn-navy" onclick="go('exercise')">2 · Diligenciar proyectos</button>
+        <button class="btn btn-light" onclick="go('priority')">3 · Priorizar (1–5)</button>
+        <button class="btn btn-light" onclick="go('summary')">4 · Resumen ejecutivo</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="foco"><div class="bar bar-teal"></div><h3>F1 · Infraestructura dinamizadora para la conectividad y el desarrollo</h3><p>Portafolio integrado carretero, férreo, fluvial, portuario, aeroportuario + social/productiva <b>cuando corresponda</b>. Criterios: seguridad vial, accesibilidad, resiliencia climática, sostenibilidad, innovación, gestión social.</p></div>
+      <div class="foco"><div class="bar bar-amber"></div><h3>F2 · Ruta social y gestión preventiva de conflictos</h3><p>Diálogo, confianza, participación, beneficios compartidos. Alertas tempranas, conocimiento territorial, diálogo permanente, resolución oportuna. Capacidades: social, jurídica, ambiental, predial, tecnológica.</p></div>
+    </div>
+
+    <div class="card">
+      <h3>Checklist de avance (se marca solo)</h3>
+      <div id="checklist" class="checks"></div>
+      <p class="hint">Regla de oro: <b>1 proyecto = 1 fila = 1 Foco principal</b>. F1 sin F2 = obra bloqueada. F2 sin F1 = gestión sin resultado físico. Declara siempre la <b>doble llave F1↔F2</b>.</p>
+    </div>
+
+    <div class="card">
+      <h3>Seguridad y gratuidad</h3>
+      <p class="mut">✅ <b>100% gratuito y local:</b> un solo archivo HTML, sin librerías externas, sin servidor, sin cuentas, sin rastreadores. ✅ <b>Entorno seguro (no público):</b> tus datos viven solo en tu navegador. Exporta JSON/CSV para compartir por el canal que tú decidas. ✅ <b>Funciona sin internet</b> una vez abierto. Para empezar de cero en otro equipo: Exportar JSON → Importar JSON.</p>
+      <div class="toolbar">
+        <label class="btn btn-light btn-sm" style="margin:0;text-transform:none;letter-spacing:0">Importar JSON <input type="file" accept=".json,application/json" hidden onchange="importJSON(event)"></label>
+        <button class="btn btn-danger btn-sm" onclick="resetAll()">Reiniciar ejercicio (borra lo local)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCS -->
+  <section class="view" id="view-docs">
+    <div class="card">
+      <h2>Documentos · Lo principal y cómo la ANI se relaciona y contribuye</h2>
+      <p class="mut">Cada hoja tiene la misma estructura para que el ejercicio sea comparable. Pega o resume <b>solo lo que dice el documento</b>. Si algo no está, déjalo pendiente. La columna “Relación ANI” es tu análisis: ¿qué le pide, qué le ofrece, qué debe hacer la ANI?</p>
+      <div class="tabs" id="docTabs"></div>
+      <div id="docPanel"></div>
+    </div>
+  </section>
+
+  <!-- EXERCISE -->
+  <section class="view" id="view-exercise">
+    <div class="card">
+      <h2>Ejercicio PEI · Tabla de trazabilidad</h2>
+      <p class="mut">Columnas: <b>FOCO → OBJETIVO ESTRATÉGICO → PROYECTO → UNIDAD DE MEDIDA → META 2030 → DETALLE</b>. Todo se diligencia en línea y se guarda solo. Usa el scoring en el paso 3 para priorizar.</p>
+      <div class="toolbar">
+        <button class="btn btn-teal" onclick="addProject()">+ Nuevo proyecto</button>
+        <select id="filterFoco" onchange="renderProjects()"><option value="">Todos los focos</option><option value="F1">Solo F1</option><option value="F2">Solo F2</option></select>
+        <input type="text" id="searchProj" placeholder="Buscar proyecto…" style="width:auto;flex:1;min-width:160px" oninput="renderProjects()">
+        <span class="pill" id="projCount">0 proyectos</span>
+      </div>
+      <div id="projList"></div>
+      <div id="emptyProj" class="card" style="text-align:center">
+        <h3>Aún no hay proyectos</h3>
+        <p class="mut">Crea el primero con el botón de arriba. Ejemplo de formato (no es dato ANI): F1 · Corredor X — tramo Y · km · Por definir — línea base pendiente · Detalle con criterios transversales.</p>
+        <button class="btn btn-teal" onclick="addProject()">+ Crear mi primer proyecto</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIORITY -->
+  <section class="view" id="view-priority">
+    <div class="card">
+      <h2>Priorización inteligente · Scoring 1–5</h2>
+      <p class="mut">Puntúa cada proyecto en 9 criterios (1 = Muy Bajo … 5 = Muy Alto). La matriz se ubica sola: <b>Impacto</b> = promedio de (impacto institucional, impacto nacional, alineación). <b>Esfuerzo</b> = inverso de factibilidad media (a menor factibilidad, mayor esfuerzo). Ajusta con los sliders en cada proyecto (paso 2) o aquí en resumen.</p>
+      <div class="row">
+        <div>
+          <h3>Taller 20 minutos — “Doble llave”</h3>
+          <div class="timer" id="timer">20:00</div>
+          <div class="toolbar">
+            <button class="btn btn-teal btn-sm" onclick="timerStart()">Iniciar</button>
+            <button class="btn btn-light btn-sm" onclick="timerPause()">Pausar</button>
+            <button class="btn btn-light btn-sm" onclick="timerReset()">Reiniciar</button>
+          </div>
+          <p class="hint">1) Cada mesa llena 1 fila · 2) Puntúa 9 criterios · 3) Ubica en matriz · 4) Declara su doble llave F1↔F2.</p>
+        </div>
+        <div>
+          <h3>Ranking automático</h3>
+          <div id="ranking"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Matriz Impacto vs. Esfuerzo</h3>
+      <div class="matrix-wrap">
+        <div class="quad"><h4>🟢 Quick Wins — Alto impacto · Bajo esfuerzo</h4><div id="q1"></div></div>
+        <div class="quad"><h4>🔵 Iniciativas Estratégicas — Alto impacto · Alto esfuerzo</h4><div id="q2"></div></div>
+        <div class="quad"><h4>⚪ Descartar / rediseñar — Bajo impacto · Bajo esfuerzo</h4><div id="q3"></div></div>
+        <div class="quad"><h4>🟠 Transformaciones — Bajo impacto hoy · Alto esfuerzo</h4><div id="q4"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section class="view" id="view-summary">
+    <div class="card">
+      <h2>Resumen ejecutivo (auto-generado)</h2>
+      <p class="mut">Se actualiza solo con lo que diligencias. Revísalo antes de exportar o imprimir.</p>
+      <div id="summaryBody"></div>
+      <div class="toolbar no-print">
+        <button class="btn btn-teal" onclick="exportCSV()">Exportar CSV (tabla PEI)</button>
+        <button class="btn btn-navy" onclick="exportJSON()">Exportar JSON (respaldo completo)</button>
+        <button class="btn btn-light" onclick="window.print()">Imprimir / PDF</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <b>Entorno seguro:</b> esta app no envía datos a ningún servidor. Todo se guarda en <span class="kbd">localStorage</span> de tu navegador. Para compartir, exporta el archivo y envíalo por tu canal institucional. <b>Gratuito:</b> sin suscripciones ni librerías externas. Fuentes: 2 imágenes suministradas (2 Focos + tabla PEI). Documentos PND / Chocó Renace / Ministra / Destrabe: contenido pendiente de carga por el equipo — esta app no inventa su contenido.
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='ani_pei_2027_2030_v1';
+const DOCS=[
+ {id:'pnd', name:'PND', full:'Plan Nacional de Desarrollo', color:'navy'},
+ {id:'choco', name:'Plan Chocó Renace', full:'Plan Chocó Renace', color:'teal'},
+ {id:'ministra', name:'Discursos Ministra', full:'Discursos de la Ministra', color:'amber'},
+ {id:'destrabe', name:'Plan Destrabe', full:'Plan Destrabe', color:'navy'},
+];
+const CRITERIA=[
+ ['impInst','Impacto institucional'],['impNac','Impacto nacional'],['alineacion','Alineación estratégica'],
+ ['factTec','Factibilidad técnica'],['factFin','Factibilidad financiera'],['factJur','Factibilidad jurídica'],
+ ['factPol','Factibilidad política'],['riesgo','Riesgo (5 = riesgo alto)'],['tiempo','Tiempo (5 = más tiempo)']
+];
+let activeDoc='pnd', activeView='dashboard';
+let state=load()||defaultState();
+let timerSec=20*60, timerInt=null;
+
+function defaultState(){
+  return {docs:{pnd:blankDoc(),choco:blankDoc(),ministra:blankDoc(),destrabe:blankDoc()},projects:[],updatedAt:null};
+}
+function blankDoc(){return {titulo:'',fecha:'',emisor:'',resumen:'',puntos:[],relacionTipo:'',relacion:'',contribuciones:[],foco:'',evidencia:'',pendiente:''}}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
+function save(){
+  state.updatedAt=new Date().toISOString();
+  localStorage.setItem(KEY,JSON.stringify(state));
+  const t=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('saveStatus').textContent='Guardado local · '+t;
+  renderAll(false);
+}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* NAV */
+const STEPS=[['dashboard','Panel','Inicio'],['docs','Documentos','4 hojas'],['exercise','Ejercicio PEI','Tabla'],['priority','Priorización','Scoring 1–5'],['summary','Resumen','Exportar']];
+function renderSteps(){
+  document.getElementById('stepsNav').innerHTML=STEPS.map((s,i)=>{
+    const done=isStepDone(s[0]);
+    return `<button class="step ${activeView===s[0]?'active':''} ${done?'done':''}" onclick="go('${s[0]}')"><span class="n">${done?'✓':i+1}</span><span><b>${s[1]}</b><span>${s[2]}</span></span></button>`;
+  }).join('');
+}
+function go(v){activeView=v;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+v));renderSteps();window.scrollTo({top:0,behavior:'smooth'})}
+function isStepDone(v){
+  if(v==='docs') return DOCS.every(d=>docComplete(state.docs[d.id]));
+  if(v==='exercise') return state.projects.length>0 && state.projects.every(p=>projValid(p));
+  if(v==='priority') return state.projects.length>0 && state.projects.every(p=>scored(p));
+  if(v==='summary') return state.projects.length>0;
+  return false;
+}
+function docComplete(d){return d.resumen.trim().length>=20 && d.relacion.trim().length>=20 && d.contribuciones.some(c=>c.trim())}
+function projValid(p){return p.foco && p.objetivo.trim() && p.proyecto.trim() && p.unidad.trim() && p.meta.trim() && p.detalle.trim()}
+function scored(p){return CRITERIA.every(([k])=>p.scores[k]>=1&&p.scores[k]<=5)}
+
+/* DOCS */
+function renderDocTabs(){
+  document.getElementById('docTabs').innerHTML=DOCS.map(d=>{
+    const ok=docComplete(state.docs[d.id]);
+    return `<button class="tab ${activeDoc===d.id?'active':''}" onclick="activeDoc='${d.id}';renderDocs()"><span class="dot ${ok?'ok':''}"></span>${d.name}</button>`;
+  }).join('');
+}
+function renderDocs(){
+  renderDocTabs();
+  const d=state.docs[activeDoc]; const meta=DOCS.find(x=>x.id===activeDoc);
+  const list=(arr,fn)=>arr.map((v,i)=>`<div class="listrow"><input type="text" value="${esc(v)}" placeholder="${fn}" oninput="setDocList('${activeDoc}','${fn==='Punto principal…'?'puntos':'contribuciones'}',${i},this.value)"><button class="btn btn-danger btn-sm" onclick="delDocList('${activeDoc}','${fn==='Punto principal…'?'puntos':'contribuciones'}',${i})">✕</button></div>`).join('');
+  document.getElementById('docPanel').innerHTML=`
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${meta.color==='teal'?'teal':meta.color==='amber'?'amber':'navy'}">${meta.full}</span><span class="pill ${docComplete(d)?'ok':'warn'}">${docComplete(d)?'Completa':'Pendiente de diligenciar'}</span></div>
+  <div class="row">
+    <div><label>Título del documento</label><input type="text" value="${esc(d.titulo)}" placeholder="Ej.: PND 2026–2030, capítulo…" oninput="setDoc('${activeDoc}','titulo',this.value)"></div>
+    <div><label>Fecha / vigencia</label><input type="text" value="${esc(d.fecha)}" placeholder="Ej.: 2026 / 2027–2030" oninput="setDoc('${activeDoc}','fecha',this.value)"></div>
+  </div>
+  <label>Emisor / fuente</label><input type="text" value="${esc(d.emisor)}" placeholder="Quién lo emite (no inventes si no está)" oninput="setDoc('${activeDoc}','emisor',this.value)">
+  <label>Resumen ejecutivo — lo principal (solo lo que dice el documento)</label>
+  <textarea placeholder="Pega o resume lo esencial. Si no está en el documento, escribe: Información insuficiente para concluir." oninput="setDoc('${activeDoc}','resumen',this.value)">${esc(d.resumen)}</textarea>
+  <label>Puntos principales</label>${list(d.puntos.length?d.puntos:[''],'Punto principal…')}
+  <button class="btn btn-light btn-sm" onclick="addDocList('${activeDoc}','puntos')">+ Agregar punto</button>
+  <div class="row">
+    <div><label>¿Cómo se relaciona la ANI? (tipo)</label><select onchange="setDoc('${activeDoc}','relacionTipo',this.value)"><option value="">Seleccionar…</option><option ${d.relacionTipo==='Directa'?'selected':''}>Directa</option><option ${d.relacionTipo==='Indirecta'?'selected':''}>Indirecta</option><option ${d.relacionTipo==='Por definir'?'selected':''}>Por definir</option></select></div>
+    <div><label>Foco asociado</label><select onchange="setDoc('${activeDoc}','foco',this.value)"><option value="">Seleccionar…</option><option ${d.foco==='F1'?'selected':''}>F1 · Infraestructura dinamizadora</option><option ${d.foco==='F2'?'selected':''}>F2 · Ruta social</option><option ${d.foco==='F1+F2'?'selected':''}>F1 + F2</option></select></div>
+  </div>
+  <label>Relación ANI — qué le pide / qué le ofrece / qué debe hacer la ANI</label>
+  <textarea placeholder="Ej.: El documento exige X; la ANI contribuye con Y; queda pendiente Z. Cita la página/sección si la tienes." oninput="setDoc('${activeDoc}','relacion',this.value)">${esc(d.relacion)}</textarea>
+  <label>Contribución concreta de la ANI</label>${list(d.contribuciones.length?d.contribuciones:[''],'Contribución…')}
+  <button class="btn btn-light btn-sm" onclick="addDocList('${activeDoc}','contribuciones')">+ Agregar contribución</button>
+  <label>Evidencia / cita (página, artículo, párrafo)</label><input type="text" value="${esc(d.evidencia)}" placeholder="Dónde está lo que afirmas" oninput="setDoc('${activeDoc}','evidencia',this.value)">
+  <label>¿Qué falta? (Información insuficiente para concluir)</label><input type="text" value="${esc(d.pendiente)}" placeholder="Ej.: Falta línea base, falta presupuesto…" oninput="setDoc('${activeDoc}','pendiente',this.value)">
+  <details><summary>Preguntas guía para diligenciar sin inventar</summary><ul><li>¿Qué ordena o pide explícitamente este documento a la ANI?</li><li>¿Qué proyecto o capacidad ANI responde? ¿F1, F2 o ambos?</li><li>¿Cuál es la evidencia (página/artículo)?</li><li>¿Qué no dice el documento y por tanto no podemos concluir?</li></ul></details>`;
+}
+function setDoc(id,k,v){state.docs[id][k]=v;save()}
+function setDocList(id,k,i,v){state.docs[id][k][i]=v;save()}
+function addDocList(id,k){state.docs[id][k].push('');save();renderDocs()}
+function delDocList(id,k,i){state.docs[id][k].splice(i,1);save();renderDocs()}
+
+/* PROJECTS */
+function newProject(){return {id:'p'+Date.now()+Math.random().toString(16).slice(2,6),foco:'',objetivo:'',proyecto:'',unidad:'',meta:'',detalle:'',doble:'',lineaBase:'',scores:{impInst:3,impNac:3,alineacion:3,factTec:3,factFin:3,factJur:3,factPol:3,riesgo:3,tiempo:3}}}
+function addProject(){state.projects.push(newProject());save();renderProjects();toast('Proyecto creado')}
+function delProject(id){if(!confirm('¿Eliminar este proyecto?'))return;state.projects=state.projects.filter(p=>p.id!==id);save();renderProjects()}
+function dupProject(id){const p=state.projects.find(x=>x.id===id);if(!p)return;const c=JSON.parse(JSON.stringify(p));c.id='p'+Date.now();c.proyecto+=' (copia)';state.projects.push(c);save();renderProjects()}
+function setProj(id,k,v){const p=state.projects.find(x=>x.id===id);if(p){p[k]=v;save()}}
+function setScore(id,k,v){const p=state.projects.find(x=>x.id===id);if(p){p.scores[k]=+v;save()}}
+function projScore(p){const s=p.scores;const imp=(s.impInst+s.impNac+s.alineacion)/3;const fact=(s.factTec+s.factFin+s.factJur+s.factPol)/4;const eff=6-fact;return {imp,eff,total:imp+fact}}
+function category(p){const {imp,eff}=projScore(p);if(imp>=3.5&&eff<=2.5)return['Quick Win','ok'];if(imp>=3.5)return['Iniciativa Estratégica','navy'];if(eff<=2.5)return['Descartar / rediseñar','warn'];return['Transformación estructural','amber']}
+function renderProjects(){
+  const f=document.getElementById('filterFoco')?.value||''; const q=(document.getElementById('searchProj')?.value||'').toLowerCase();
+  const list=state.projects.filter(p=>(!f||p.foco===f)&&(!q||(p.proyecto+p.objetivo+p.detalle).toLowerCase().includes(q)));
+  document.getElementById('projCount').textContent=state.projects.length+' proyectos';
+  document.getElementById('emptyProj').style.display=state.projects.length?'none':'block';
+  document.getElementById('projList').innerHTML=list.map(p=>{
+    const valid=projValid(p); const [cat,cls]=category(p);
+    return `<div class="proj">
+    <div class="proj-head"><b>${esc(p.proyecto||'Proyecto sin nombre')}</b><span class="pill ${p.foco==='F1'?'teal':p.foco==='F2'?'amber':'warn'}">${p.foco||'Sin foco'}</span><span class="pill ${valid?'ok':'warn'}">${valid?'Válida':'Incompleta'}</span><span class="pill ${cls}">${cat}</span><span style="flex:1"></span><button class="btn btn-light btn-sm" onclick="dupProject('${p.id}')">Duplicar</button><button class="btn btn-danger btn-sm" onclick="delProject('${p.id}')">Eliminar</button></div>
+    <div class="proj-grid">
+      <div><label>Foco (Iniciativa)</label><select onchange="setProj('${p.id}','foco',this.value)"><option value="">Seleccionar…</option><option ${p.foco==='F1'?'selected':''}>F1 · Infraestructura dinamizadora</option><option ${p.foco==='F2'?'selected':''}>F2 · Ruta social</option></select></div>
+      <div><label>Proyecto</label><input type="text" value="${esc(p.proyecto)}" placeholder="Nombre único y verificable" oninput="setProj('${p.id}','proyecto',this.value)"></div>
+      <div><label>Objetivo Estratégico</label><input type="text" value="${esc(p.objetivo)}" placeholder="Objetivo vigente ANI (no inventar)" oninput="setProj('${p.id}','objetivo',this.value)"></div>
+      <div><label>Unidad de medida</label><input type="text" value="${esc(p.unidad)}" placeholder="km, %, casos, proyectos…" oninput="setProj('${p.id}','unidad',this.value)"></div>
+      <div><label>Meta 2030</label><input type="text" value="${esc(p.meta)}" placeholder="Número + unidad + fecha, o Por definir" oninput="setProj('${p.id}','meta',this.value)"></div>
+      <div><label>Línea base</label><input type="text" value="${esc(p.lineaBase)}" placeholder="O: Información insuficiente para concluir" oninput="setProj('${p.id}','lineaBase',this.value)"></div>
+    </div>
+    <label>Detalle (contribución + criterios F1 / capacidades F2)</label><textarea placeholder="Cómo contribuye al Foco, criterios transversales o capacidades, supuestos y riesgos." oninput="setProj('${p.id}','detalle',this.value)">${esc(p.detalle)}</textarea>
+    <label>Doble llave F1 ↔ F2 (proyecto asociado)</label><input type="text" value="${esc(p.doble)}" placeholder="Ej.: F1 Corredor X ↔ F2 Alertas territoriales Y" oninput="setProj('${p.id}','doble',this.value)">
+    <label>Scoring 1–5 (1 Muy Bajo … 5 Muy Alto)</label>
+    <div class="score-grid">${CRITERIA.map(([k,label])=>`<div class="score"><b>${label}</b><input type="range" min="1" max="5" step="1" value="${p.scores[k]}" oninput="setScore('${p.id}','${k}',this.value);this.nextElementSibling.textContent=this.value"><output>${p.scores[k]}</output></div>`).join('')}</div>
+    </div>`;
+  }).join('');
+  renderPriority();
+}
+
+/* PRIORITY */
+function renderPriority(){
+  const ranked=[...state.projects].sort((a,b)=>projScore(b).total-projScore(a).total);
+  document.getElementById('ranking').innerHTML=ranked.length?ranked.map((p,i)=>`<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><b style="color:var(--navy)">#${i+1}</b><span style="flex:1;font-size:13px">${esc(p.proyecto||'Sin nombre')}</span><span class="pill">${projScore(p).total.toFixed(1)}</span></div>`).join(''):'<p class="mut">Sin proyectos aún. Ve al paso 2 y crea el primero.</p>';
+  const buckets={q1:[],q2:[],q3:[],q4:[]};
+  state.projects.forEach(p=>{const {imp,eff}=projScore(p);if(imp>=3.5&&eff<=2.5)buckets.q1.push(p);else if(imp>=3.5)buckets.q2.push(p);else if(eff<=2.5)buckets.q3.push(p);else buckets.q4.push(p)});
+  ['q1','q2','q3','q4'].forEach(k=>{document.getElementById(k).innerHTML=buckets[k].length?buckets[k].map(p=>`<span class="chip">${esc(p.proyecto||'Sin nombre')}</span>`).join(''):'<span class="mut">—</span>'});
+}
+
+/* DASHBOARD + SUMMARY */
+function progress(){
+  const d=DOCS.filter(x=>docComplete(state.docs[x.id])).length/4;
+  const p=state.projects.length?state.projects.filter(projValid).length/state.projects.length:0;
+  const s=state.projects.length?state.projects.filter(scored).length/state.projects.length:0;
+  return Math.round((d*0.35+p*0.4+s*0.25)*100);
+}
+function renderDashboard(){
+  const d=DOCS.filter(x=>docComplete(state.docs[x.id])).length;
+  const v=state.projects.filter(projValid).length;
+  const pct=progress();
+  document.getElementById('stDocs').textContent=d+'/4';
+  document.getElementById('stProj').textContent=state.projects.length;
+  document.getElementById('stValid').textContent=v;
+  document.getElementById('stPct').textContent=pct+'%';
+  document.getElementById('globalBar').style.width=pct+'%';
+  const items=[
+    ['Documentos con relación ANI completa',d===4,d+'/4'],
+    ['Al menos 1 proyecto creado',state.projects.length>0,state.projects.length+''],
+    ['Todas las filas validadas',state.projects.length>0&&v===state.projects.length,v+'/'+state.projects.length],
+    ['Scoring completo',state.projects.length>0&&state.projects.every(scored),''],
+    ['Doble llave declarada',state.projects.length>0&&state.projects.every(p=>p.doble.trim()),''],
+  ];
+  document.getElementById('checklist').innerHTML=items.map(([t,ok,n])=>`<span class="pill ${ok?'ok':'warn'}">${ok?'✓':'○'} ${t} ${n}</span>`).join('');
+}
+function renderSummary(){
+  const docs=DOCS.map(d=>{const x=state.docs[d.id];return `<tr><td><b>${d.name}</b></td><td>${esc(x.resumen.slice(0,220))||'<i>Información insuficiente para concluir</i>'}</td><td>${esc(x.relacion.slice(0,220))||'—'}</td><td>${esc(x.foco||'—')}</td></tr>`}).join('');
+  const projs=state.projects.map(p=>{const [cat]=category(p);return `<tr><td>${p.foco||'—'}</td><td>${esc(p.proyecto||'—')}</td><td>${esc(p.unidad||'—')}</td><td>${esc(p.meta||'Por definir')}</td><td>${cat}</td></tr>`}).join('')||'<tr><td colspan="5"><i>Sin proyectos aún</i></td></tr>';
+  document.getElementById('summaryBody').innerHTML=`
+  <div class="grid3"><div class="stat"><b>${progress()}%</b><span>Avance global</span></div><div class="stat"><b>${state.projects.length}</b><span>Proyectos</span></div><div class="stat"><b>${state.projects.filter(p=>p.foco==='F1').length} / ${state.projects.filter(p=>p.foco==='F2').length}</b><span>F1 / F2</span></div></div>
+  <h3>Documentos → Relación ANI</h3><table><tr><th>Documento</th><th>Lo principal</th><th>Relación ANI</th><th>Foco</th></tr>${docs}</table>
+  <h3>Proyectos PEI 2027–2030</h3><table><tr><th>Foco</th><th>Proyecto</th><th>Unidad</th><th>Meta 2030</th><th>Categoría</th></tr>${projs}</table>
+  <p class="hint">Generado localmente el ${new Date().toLocaleString('es-CO')}. Sin datos inventados: lo no diligenciado queda como pendiente.</p>`;
+}
+function renderAll(steps=true){renderSteps();renderDocs();renderProjects();renderDashboard();renderSummary()}
+
+/* EXPORT / IMPORT */
+function download(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href);toast('Exportado: '+name)}
+function exportJSON(){download('ANI_PEI_2027-2030_respaldo.json',JSON.stringify(state,null,2),'application/json')}
+function exportCSV(){
+  const head=['FOCO','OBJETIVO','PROYECTO','UNIDAD','META 2030','DETALLE','DOBLE LLAVE','LINEA BASE',...CRITERIA.map(c=>c[1]),'CATEGORIA'];
+  const rows=state.projects.map(p=>[p.foco,p.objetivo,p.proyecto,p.unidad,p.meta,p.detalle,p.doble,p.lineaBase,...CRITERIA.map(([k])=>p.scores[k]),category(p)[0]]);
+  const csv=[head,...rows].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  download('ANI_PEI_2027-2030_tabla.csv','\ufeff'+csv,'text/csv;charset=utf-8');
+}
+function importJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(j.docs&&j.projects){state=j;save();toast('Importado correctamente')}else alert('Archivo no válido')}catch(err){alert('No se pudo importar: '+err.message)}};r.readAsText(f)}
+function resetAll(){if(!confirm('¿Borrar todo lo guardado en este navegador? Exporta antes si lo necesitas.'))return;localStorage.removeItem(KEY);state=defaultState();save();toast('Ejercicio reiniciado')}
+
+/* TIMER */
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function timerStart(){if(timerInt)return;timerInt=setInterval(()=>{if(timerSec>0){timerSec--;document.getElementById('timer').textContent=fmt(timerSec)}else{clearInterval(timerInt);timerInt=null;toast('Tiempo cumplido')}},1000)}
+function timerPause(){clearInterval(timerInt);timerInt=null}
+function timerReset(){timerPause();timerSec=20*60;document.getElementById('timer').textContent='20:00'}
+
+renderAll();
+</script>
+</body>
+</html>
