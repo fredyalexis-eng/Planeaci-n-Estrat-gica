@@ -1,5 +1,7 @@
-# Deploy GitHub Pages — App Interactiva ANI PEI 2027-2030
-# Publica el index.html de la raíz en https://fredyalexis-eng.github.io/Planeaci-n-Estrat-gica/
+# Deploy GitHub Pages — ANI STRATEGY LAB (PEI 2027-2030)
+# Publica exclusivamente el frontend estático y los documentos públicos en:
+# https://fredyalexis-eng.github.io/Planeaci-n-Estrat-gica/
+# Excluye explícitamente server/, package.json, .env* y artefactos internos.
 name: Deploy GitHub Pages
 
 on:
@@ -26,13 +28,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stage public static frontend only
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp index.html .nojekyll _site/
+          cp 01_Marco_Estrategico_ANI_2027-2030.md _site/
+          cp 02_Plantilla_Ejercicio_PEI_2027-2030.csv _site/
+          cp 03_Canvas_2_Focos_ANI.html _site/
+          cp 04_App_Interactiva_ANI.md _site/
+          cp -r assets data _site/
+          # Verificación defensiva: ningún archivo de servidor ni .env en el artefacto
+          ! find _site -name ".env*" -o -name "*.mjs" | grep -q .
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

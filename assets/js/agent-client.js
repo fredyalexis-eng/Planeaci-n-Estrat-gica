@@ -343,7 +343,54 @@ export async function fetchCitationChunk(chunkId) {
       const data = await res.json();
       if (data?.chunk) return data.chunk;
     }
-  } catch { /* fallback */ }
+  } catch { /* fallback estático */ }
+
+  // Respaldo dinámico para GitHub Pages: extrae la sección exacta del Markdown original
+  if (chunkId.startsWith('MARCO-')) {
+    try {
+      const mdRes = await fetch('./01_Marco_Estrategico_ANI_2027-2030.md');
+      if (mdRes.ok) {
+        const raw = await mdRes.text();
+        const lines = raw.split(/\r?\n/);
+        const target = chunkId.replace('MARCO-', '');
+        let start = -1;
+        let heading = '';
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(/^(#{2,3})\s+(.+)$/);
+          if (!m) continue;
+          const h = m[2].trim();
+          const num = h.match(/^(\d+(?:\.\d+)?)\b/);
+          const code = num ? `S${num[1]}` : (/riesgos/i.test(h) ? 'S4-RIESGOS' : (/marco de decisi/i.test(h) ? 'INTRO' : ''));
+          if (start >= 0) {
+            return {
+              id: chunkId,
+              docTitle: 'Marco Estratégico ANI — PEI 2027–2030',
+              section: heading,
+              sourceFile: '01_Marco_Estrategico_ANI_2027-2030.md',
+              lineRange: `L${start + 1}–L${i}`,
+              authorityStatus: 'marco_repositorio',
+              content: lines.slice(start, i).join('\n').trim()
+            };
+          }
+          if (code === target) {
+            start = i;
+            heading = h;
+          }
+        }
+        if (start >= 0) {
+          return {
+            id: chunkId,
+            docTitle: 'Marco Estratégico ANI — PEI 2027–2030',
+            section: heading,
+            sourceFile: '01_Marco_Estrategico_ANI_2027-2030.md',
+            lineRange: `L${start + 1}–L${lines.length}`,
+            authorityStatus: 'marco_repositorio',
+            content: lines.slice(start).join('\n').trim()
+          };
+        }
+      }
+    } catch { /* fallback a catálogo local */ }
+  }
   return STATIC_FALLBACK_CHUNKS.find((c) => c.id === chunkId) || null;
 }
 

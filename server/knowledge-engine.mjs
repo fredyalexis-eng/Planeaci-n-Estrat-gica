@@ -95,6 +95,7 @@ function parseMarkdownSections(content, { docPrefix, sourceFile, docTitle, autho
   const deriveSectionCode = (heading) => {
     const numMatch = heading.match(/^(\d+(?:\.\d+)?)\b/);
     if (numMatch) return `S${numMatch[1]}`;
+    if (/marco de decisi/i.test(heading)) return 'INTRO';
     if (/riesgos/i.test(heading)) return 'S4-RIESGOS';
     if (/archivos entregados/i.test(heading)) return 'ANEXO';
     if (/encabezado/i.test(heading)) return 'S0';

@@ -69,6 +69,11 @@ export function blankPndAxis(numero) {
   };
 }
 
+export function safeId(raw, prefix = 'id') {
+  const clean = String(raw || '').replace(/[^A-Za-z0-9_-]/g, '');
+  return clean || uid(prefix);
+}
+
 export function createProject(overrides = {}) {
   const defaultScores = {
     impInst: 3, impNac: 3, alineacion: 3,
@@ -83,7 +88,7 @@ export function createProject(overrides = {}) {
     }
   }
   return {
-    id: overrides.id || uid('p'),
+    id: safeId(overrides.id, 'p'),
     foco: normalizeFoco(overrides.foco) === 'F2' ? 'F2' : (normalizeFoco(overrides.foco) === 'F1' ? 'F1' : ''),
     objetivo: String(overrides.objetivo ?? ''),
     proyecto: String(overrides.proyecto ?? ''),
