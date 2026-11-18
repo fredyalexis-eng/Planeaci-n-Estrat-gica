@@ -1,0 +1,16 @@
+{
+  "name": "ani-strategy-lab",
+  "version": "1.0.0",
+  "description": "ANI STRATEGY LAB — Plataforma interactiva de planeación e inteligencia estratégica institucional (PEI 2027-2030) para la Agencia Nacional de Infraestructura de Colombia.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs",
+    "verify:arena": "node server/verify-arena-cli.mjs",
+    "test": "node --test server/agent.test.mjs"
+  }
+}
