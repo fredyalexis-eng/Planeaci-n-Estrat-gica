@@ -31,12 +31,13 @@ export function normalizeText(text = '') {
 }
 
 function lightSpanishStem(token) {
+  if (/^(f[12]|r[1-6]|eje[1-7]|oe\d+|pa\d+)$/.test(token)) return token;
   if (token.length <= 4) return token;
   const suffixes = [
     'amientos', 'imientos', 'aciones', 'iciones', 'adoras', 'adores', 'idades',
     'amiento', 'imiento', 'acion', 'icion', 'adora', 'ador', 'idad', 'ivas', 'ivos',
-    'ales', 'ibles', 'ables', 'mente', 'anza', 'encia', 'iva', 'ivo', 'osa', 'oso',
-    'es', 'os', 'as', 's'
+    'ales', 'ibles', 'ables', 'mente', 'anzas', 'anza', 'encias', 'encia',
+    'iva', 'ivo', 'osa', 'oso', 'es', 'os', 'as', 'o', 'a', 's'
   ];
   for (const suf of suffixes) {
     if (token.length - suf.length >= 4 && token.endsWith(suf)) {
@@ -49,9 +50,22 @@ function lightSpanishStem(token) {
 export function tokenize(text = '') {
   const norm = normalizeText(text);
   if (!norm) return [];
-  const raw = norm.split(' ');
   const out = [];
-  for (const tok of raw) {
+
+  // Preservar identificadores compuestos estratégicos (Foco 1/2, Eje 1-7, R1-R6, conceptos clave)
+  for (const m of norm.matchAll(/\bfoco\s+([12])\b/g)) out.push(`f${m[1]}`, `foco${m[1]}`);
+  for (const m of norm.matchAll(/\beje\s+([1-7])\b/g)) out.push(`eje${m[1]}`);
+  for (const m of norm.matchAll(/\brecomendacion\s+([1-6])\b/g)) out.push(`r${m[1]}`);
+  if (norm.includes('doble llave')) out.push('doblellave');
+  if (norm.includes('linea base') || norm.includes('lineas base')) out.push('lineabase');
+  if (norm.includes('alertas tempranas') || norm.includes('alerta temprana')) out.push('alertastempranas');
+  if (norm.includes('cuellos de botella') || norm.includes('cuello de botella')) out.push('cuellosbotella');
+  if (norm.includes('ruta social')) out.push('rutasocial');
+  if (norm.includes('plan de accion')) out.push('planaccion');
+  if (norm.includes('choco renace')) out.push('chocorenace');
+  if (norm.includes('plan destrabe')) out.push('plandestrabe');
+
+  for (const tok of norm.split(' ')) {
     if (tok.length < 2) continue;
     if (SPANISH_STOPWORDS.has(tok)) continue;
     out.push(lightSpanishStem(tok));

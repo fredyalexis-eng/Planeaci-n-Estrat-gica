@@ -31,9 +31,11 @@ import {
   computeMetrics,
   buildPeiCsv,
   buildActionPlanCsv,
-  buildCsv,
-  importPeiFromCsv
+  buildOpportunitiesCsv,
+  importPeiFromCsv,
+  importActionPlanFromCsv
 } from './state.js';
+import { sanitizeMediaUrl } from '../../data/media-manifest.js';
 import {
   renderDashboard,
   renderIdentity,
@@ -54,8 +56,10 @@ import {
   searchKnowledge,
   runAudit,
   fetchCitationChunk,
+  fetchRepoMedia,
   sendAgentMessage,
-  setBackendBase
+  setBackendBase,
+  apiUrl
 } from './agent-client.js';
 
 export const MODULES = [
@@ -84,11 +88,18 @@ export function createAniApp() {
     pndTab: 'ejes',
     activeDoc: 'pnd',
     oppFilter: '',
+    oppTab: 'todo',
     peiTab: 'fichas',
     filterFoco: '',
     searchProj: '',
+    sortProj: 'orden',
     paTab: 'fichas',
     paFilter: '',
+    paEstadoFilter: '',
+    searchPa: '',
+    mediaTab: 'todo',
+    repoMedia: { ok: false, videos: [], images: [], files: [] },
+    sessionBlobs: {},
     timerSec: 20 * 60,
     timerHandle: null,
     drawerOpen: false
@@ -99,6 +110,7 @@ export function createAniApp() {
     statusData: null,
     verifyResult: null,
     activeMode: 'consulta',
+    selectedModel: '',
     messages: [],
     busy: false,
     searchQuery: '',
@@ -132,7 +144,12 @@ export function createAniApp() {
     if (modId === 'opportunities') return String(6 + m.oppTotal);
     if (modId === 'pei') return String(m.projTotal);
     if (modId === 'action-plan') return String(m.paTotal);
-    if (modId === 'media') return String(1 + state.mediaAssets.length);
+    if (modId === 'media') {
+      const repoCount = Array.isArray(ui.repoMedia?.files) ? ui.repoMedia.files.length : 0;
+      const slotUrls = Object.values(state.mediaSlots || {}).filter((s) => s?.url?.trim()).length;
+      const blobCount = Object.keys(ui.sessionBlobs || {}).length;
+      return String(1 + repoCount + slotUrls + blobCount + state.mediaAssets.length);
+    }
     if (modId === 'agent') return 'IA';
     return '';
   }
@@ -203,10 +220,19 @@ export function createAniApp() {
       case 'identity': return renderIdentity(state);
       case 'focos': return renderFocos(state, ui.focosTab);
       case 'pnd-docs': return renderPndDocs(state, ui.pndTab, ui.activeDoc);
-      case 'opportunities': return renderOpportunities(state, ui.oppFilter);
+      case 'opportunities': return renderOpportunities(state, ui.oppFilter, ui.oppTab);
       case 'pei': return renderPei(state, { ...ui, timerLabel: formatTimer(ui.timerSec) });
-      case 'action-plan': return renderActionPlan(state, ui.paTab, ui.paFilter);
-      case 'media': return renderMedia(state);
+      case 'action-plan': return renderActionPlan(state, {
+        paTab: ui.paTab,
+        filterFoco: ui.paFilter,
+        filterEstado: ui.paEstadoFilter,
+        searchPa: ui.searchPa
+      });
+      case 'media': return renderMedia(state, {
+        mediaTab: ui.mediaTab,
+        repoMedia: ui.repoMedia,
+        sessionBlobs: ui.sessionBlobs
+      });
       case 'agent': return renderAgentModule(state, agentUi);
       default: return renderDashboard(state);
     }
@@ -258,6 +284,10 @@ export function createAniApp() {
         .map(([lbl, cOk]) => `<span class="badge ${cOk ? 'badge-ok' : 'badge-warn'}">${cOk ? '✓' : '○'} ${esc(lbl)}</span>`)
         .join('');
     }
+    const r6El = document.querySelector(`[data-proj-r6="${id}"]`);
+    if (r6El) {
+      r6El.style.display = projHasBaselineIssue(p) ? '' : 'none';
+    }
   }
 
   function downloadFile(filename, content, mimeType) {
@@ -290,7 +320,7 @@ export function createAniApp() {
 
   async function inspectCitation(citeId) {
     openModal(`Referencia documental [${citeId}]`, `<p class="muted">Consultando fuente verificable…</p>`);
-    const chunk = await fetchCitationChunk(citeId);
+    const chunk = await fetchCitationChunk(citeId, state);
     if (chunk) {
       openModal(
         `Fuente verificada [${chunk.id}]`,
@@ -303,14 +333,39 @@ export function createAniApp() {
       );
       return;
     }
-    // Buscar también en el espacio de trabajo local
+    // Respaldo local para fuentes de sesión (modo estático sin backend)
     const mAxis = citeId.match(/^PND-EJE-(\d)$/);
-    if (mAxis) {
+    if (mAxis && state.pndAxes[Number(mAxis[1]) - 1]) {
       const ax = state.pndAxes[Number(mAxis[1]) - 1];
-      if (ax) {
-        openModal(`Fuente de sesión [${citeId}]`, `<pre class="doc-pre">Eje ${ax.numero}: ${esc(ax.nombre || 'Pendiente')}\nResumen: ${esc(ax.resumen)}\nRelación ANI: ${esc(ax.relacionAni)}\nCita: ${esc(ax.cita || 'Pendiente')}</pre>`);
+      openModal(`Fuente de sesión [${citeId}]`, `<pre class="doc-pre">Eje ${ax.numero}: ${esc(ax.nombre || 'Pendiente')}\nCompetencia ANI: ${esc(ax.competenciaTipo || 'Por evaluar')}\nResumen: ${esc(ax.resumen)}\nRelación ANI: ${esc(ax.relacionAni)}\nCita: ${esc(ax.cita || 'Pendiente')}</pre>`);
+      return;
+    }
+    if (citeId.startsWith('FICHA-')) {
+      const key = citeId.replace('FICHA-', '').toLowerCase();
+      const d = state.docs?.[key];
+      if (d) {
+        openModal(`Ficha documental [${citeId}]`, `<pre class="doc-pre">Título: ${esc(d.titulo || key)}\nEmisor: ${esc(d.emisor)} · Fecha: ${esc(d.fecha)}\nResumen: ${esc(d.resumen)}\nRelación ANI: ${esc(d.relacion)}\nEvidencia: ${esc(d.evidencia)}</pre>`);
         return;
       }
+    }
+    if (citeId === 'SESION-IDENTIDAD') {
+      openModal(`Identidad Institucional [${citeId}]`, `<pre class="doc-pre">Misión: ${esc(state.identity.mision || 'Pendiente')}\nVisión: ${esc(state.identity.vision || 'Pendiente')}\nFuente normativa: ${esc(state.identity.fuenteNormativa || 'Pendiente')}</pre>`);
+      return;
+    }
+    if (citeId === 'SESION-CARTERA-PEI') {
+      const txt = state.projects.map((p, i) => `${i + 1}. [${p.foco || '—'}] ${p.proyecto || 'Sin nombre'} | Meta 2030: ${p.meta || 'Por definir'} | Doble llave: ${p.doble || 'Sin declarar'}`).join('\n');
+      openModal(`Cartera PEI de sesión [${citeId}]`, `<pre class="doc-pre">${esc(txt || 'Sin proyectos registrados.')}</pre>`);
+      return;
+    }
+    if (citeId === 'SESION-PLAN-ACCION') {
+      const txt = state.actionPlan.map((a, i) => `${i + 1}. [${a.foco || '—'}] ${a.actividad || 'Sin nombre'} -> ${a.entregable || '—'} (${a.estado}, ${a.avance}%)`).join('\n');
+      openModal(`Plan de Acción de sesión [${citeId}]`, `<pre class="doc-pre">${esc(txt || 'Sin actividades registradas.')}</pre>`);
+      return;
+    }
+    if (citeId === 'SESION-OPORTUNIDADES') {
+      const txt = state.opportunities.map((o, i) => `${i + 1}. [${o.foco}] ${o.titulo} (${o.ejePnd || 'PND'}) — ${o.descripcion}`).join('\n');
+      openModal(`Oportunidades de sesión [${citeId}]`, `<pre class="doc-pre">${esc(txt || 'Sin oportunidades registradas.')}</pre>`);
+      return;
     }
     openModal(`Referencia [${citeId}]`, `<p class="muted">Fragmento correspondiente al acervo activo de sesión o al archivo <code>01_Marco_Estrategico_ANI_2027-2030.md</code>.</p>`);
   }
@@ -328,6 +383,9 @@ export function createAniApp() {
       api.closeDropdowns();
       renderActiveModule();
       if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (modId === 'media') {
+        api.refreshRepoMedia(false);
+      }
       if (modId === 'agent' && agentUi.toolTab === 'auditor' && !agentUi.auditReport) {
         api.executeAudit();
       }
@@ -518,9 +576,16 @@ export function createAniApp() {
     },
 
     /* Módulo 05: Oportunidades */
+    setOppTab(tab) {
+      ui.oppTab = tab;
+      renderActiveModule();
+    },
     setOppFilter(val) {
       ui.oppFilter = val;
       renderActiveModule();
+    },
+    exportOpportunitiesCsv() {
+      api.exportOppCsv();
     },
     addOpportunity() {
       state.opportunities.unshift(createOpportunity({ foco: ui.oppFilter || 'F1' }));
@@ -567,6 +632,20 @@ export function createAniApp() {
     setPeiFilter(val) {
       ui.filterFoco = val;
       renderActiveModule();
+    },
+    setPeiSort(val) {
+      ui.sortProj = val || 'orden';
+      renderActiveModule();
+    },
+    focusProject(id) {
+      ui.peiTab = 'fichas';
+      ui.filterFoco = '';
+      ui.searchProj = '';
+      renderActiveModule();
+      if (typeof document !== 'undefined') {
+        const el = document.querySelector(`[data-proj-card="${id}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     },
     setPeiSearch(val) {
       ui.searchProj = val;
@@ -675,6 +754,27 @@ export function createAniApp() {
       ui.paFilter = val;
       renderActiveModule();
     },
+    setPaEstadoFilter(val) {
+      ui.paEstadoFilter = val;
+      renderActiveModule();
+    },
+    setPaSearch(val) {
+      ui.searchPa = val;
+      renderActiveModule();
+      const inp = typeof document !== 'undefined' ? document.querySelector('#view-action-plan input[type="search"]') : null;
+      if (inp) { inp.focus(); inp.setSelectionRange(val.length, val.length); }
+    },
+    focusAction(id) {
+      ui.paTab = 'fichas';
+      ui.paFilter = '';
+      ui.paEstadoFilter = '';
+      ui.searchPa = '';
+      renderActiveModule();
+      if (typeof document !== 'undefined') {
+        const el = document.querySelector(`[data-pa-card="${id}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    },
     addActionItem(overrides = {}) {
       const code = `PA-${String(state.actionPlan.length + 1).padStart(2, '0')}`;
       state.actionPlan.unshift(createActionItem({ codigo: code, foco: ui.paFilter || '', ...overrides }));
@@ -739,14 +839,103 @@ export function createAniApp() {
     },
 
     /* Módulo 08: Centro Audiovisual */
-    addMediaItem() {
-      state.mediaAssets.unshift(createMediaItem({ tipo: 'video', foco: 'F1+F2' }));
+    setMediaTab(tab) {
+      ui.mediaTab = tab;
+      renderActiveModule();
+    },
+    async refreshRepoMedia(notify = false) {
+      ui.repoMedia = await fetchRepoMedia();
+      renderSidebar();
+      if (ui.activeModule === 'media') renderActiveModule();
+      if (notify) {
+        const v = ui.repoMedia.videos?.length || 0;
+        const im = ui.repoMedia.images?.length || 0;
+        toast(`assets/media escaneado: ${v} video(s) y ${im} imagen(es)`);
+      }
+    },
+    setMediaSlot(slotId, key, val, rerender = false) {
+      if (!state.mediaSlots || typeof state.mediaSlots !== 'object') state.mediaSlots = {};
+      if (!state.mediaSlots[slotId]) state.mediaSlots[slotId] = { titulo: '', foco: '', url: '', descripcion: '' };
+      if (key === 'url') {
+        const trimmed = String(val || '').trim();
+        if (trimmed && !sanitizeMediaUrl(trimmed)) {
+          toast('Ruta no permitida: use ./assets/media/archivo o una URL https:// oficial');
+          renderActiveModule();
+          return;
+        }
+        state.mediaSlots[slotId].url = trimmed ? sanitizeMediaUrl(trimmed) : '';
+      } else {
+        state.mediaSlots[slotId][key] = val;
+      }
+      save(rerender);
+    },
+    previewSlotFile(slotId, ev) {
+      const file = ev?.target?.files?.[0];
+      if (!file) return;
+      const prev = ui.sessionBlobs[slotId];
+      if (prev?.url && typeof URL !== 'undefined') {
+        try { URL.revokeObjectURL(prev.url); } catch { /* ignore */ }
+      }
+      const blobUrl = URL.createObjectURL(file);
+      ui.sessionBlobs[slotId] = { url: blobUrl, name: file.name, size: file.size, type: file.type };
+      if (ev?.target) ev.target.value = '';
+      renderActiveModule();
+      toast(`Vista previa cargada: ${file.name}`);
+    },
+    clearSlotBlob(slotId) {
+      const prev = ui.sessionBlobs[slotId];
+      if (prev?.url && typeof URL !== 'undefined') {
+        try { URL.revokeObjectURL(prev.url); } catch { /* ignore */ }
+      }
+      delete ui.sessionBlobs[slotId];
+      renderActiveModule();
+      toast('Vista previa local retirada');
+    },
+    openMediaLightboxFromEl(el) {
+      if (!el) return;
+      const src = sanitizeMediaUrl(el.getAttribute('data-media-src') || '');
+      if (!src) return;
+      const title = el.getAttribute('data-media-title') || 'Imagen estratégica ANI';
+      const caption = el.getAttribute('data-media-caption') || '';
+      const foco = el.getAttribute('data-media-foco') || 'F1+F2';
+      openModal(
+        title,
+        `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="badge badge-navy">${esc(foco)}</span>
+          <a class="btn btn-outline btn-xs" href="${esc(src)}" target="_blank" rel="noopener">Abrir en pestaña nueva ↗</a>
+        </div>
+        <div class="lightbox-stage">
+          <img src="${esc(src)}" alt="${esc(title)}" class="lightbox-img">
+        </div>
+        ${caption ? `<p class="muted" style="margin-top:10px">${esc(caption)}</p>` : ''}`
+      );
+    },
+    handleMediaError(el) {
+      if (!el) return;
+      el.style.display = 'none';
+      const errBox = el.parentElement?.querySelector?.('.media-error-box');
+      if (errBox) errBox.hidden = false;
+    },
+    addMediaItem(tipo = 'video') {
+      const cleanTipo = tipo === 'imagen' ? 'imagen' : 'video';
+      state.mediaAssets.unshift(createMediaItem({ tipo: cleanTipo, foco: 'F1+F2' }));
       save(true);
+      toast(cleanTipo === 'imagen' ? 'Espacio de lámina/imagen añadido' : 'Espacio audiovisual añadido');
     },
     setMedia(id, key, val, rerender = false) {
       const m = state.mediaAssets.find((x) => x.id === id);
       if (!m) return;
-      m[key] = val;
+      if (key === 'url') {
+        const trimmed = String(val || '').trim();
+        if (trimmed && !sanitizeMediaUrl(trimmed)) {
+          toast('Ruta no permitida: use ./assets/media/archivo o una URL https:// oficial');
+          renderActiveModule();
+          return;
+        }
+        m.url = trimmed ? sanitizeMediaUrl(trimmed) : '';
+      } else {
+        m[key] = val;
+      }
       save(rerender);
     },
     delMediaItem(id) {
@@ -767,6 +956,52 @@ export function createAniApp() {
     },
     setAgentMode(mode) {
       agentUi.activeMode = mode;
+    },
+    setAgentModel(modelId) {
+      agentUi.selectedModel = String(modelId || '').trim();
+      if (ui.activeModule === 'agent') renderActiveModule();
+      toast(agentUi.selectedModel ? `Modelo Arena seleccionado: ${agentUi.selectedModel}` : 'Usando modelo predeterminado');
+    },
+    async reloadKnowledge() {
+      try {
+        const res = await fetch(apiUrl('/api/agent/knowledge/reload'), { method: 'POST', headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        await api.refreshAgentStatus();
+        toast(`Acervo reindexado: ${data.totalRepoChunks || 0} secciones`);
+      } catch {
+        toast('Reindexación disponible con el servidor backend activo');
+      }
+    },
+    exportChatTrace() {
+      if (!agentUi.messages.length) return;
+      const lines = [
+        '# ANI STRATEGY LAB — Trazabilidad de Consultas del Agente Estratégico',
+        `Fecha de exportación: ${new Date().toISOString()}`,
+        `Proveedor IA exclusivo: Arena API (https://api.arena.ai)`,
+        ''
+      ];
+      for (const m of agentUi.messages) {
+        if (m.role === 'user') {
+          lines.push(`## Consulta (${m.mode || 'consulta'})`, m.content, '');
+        } else {
+          const r = m.payload || {};
+          lines.push(`### Respuesta · Modo de generación: ${r.generationMode || 'desconocido'}`);
+          if (r.arenaMeta?.reportedModel) lines.push(`- Modelo Arena: ${r.arenaMeta.reportedModel}`);
+          if (r.arenaMeta?.traceId) lines.push(`- X-Arena-Trace-ID: ${r.arenaMeta.traceId}`);
+          if (r.statusNotice) lines.push(`- Estado: ${r.statusNotice}`);
+          if (r.governanceBadge) lines.push(`- Gobernanza: ${r.governanceBadge}`);
+          if (r.answer) lines.push('', r.answer, '');
+          if (Array.isArray(r.verifiedCitations) && r.verifiedCitations.length) {
+            lines.push('**Fuentes documentales verificadas:**');
+            for (const c of r.verifiedCitations) {
+              lines.push(`- [${c.id}] ${c.section} — ${c.sourceFile} (${c.lineRange})`);
+            }
+            lines.push('');
+          }
+        }
+      }
+      downloadFile('ANI_Trazabilidad_Agente_IA.md', lines.join('\n'), 'text/markdown;charset=utf-8');
     },
     clearChat() {
       agentUi.messages = [];
@@ -814,8 +1049,14 @@ export function createAniApp() {
       if (ui.activeModule === 'agent') renderActiveModule();
       syncDrawerFeed();
 
-      const payload = await sendAgentMessage({ message, mode, workspace: state, history });
-      agentUi.messages.push({ role: 'assistant', mode, payload });
+      const payload = await sendAgentMessage({
+        message,
+        mode,
+        workspace: state,
+        history,
+        model: agentUi.selectedModel
+      });
+      agentUi.messages.push({ role: 'assistant', mode, payload, accepted: {} });
       agentUi.busy = false;
 
       if (ui.activeModule === 'agent') renderActiveModule();
@@ -848,21 +1089,41 @@ export function createAniApp() {
       const msg = agentUi.messages[msgIdx];
       const props = msg?.payload?.proposals;
       if (!props) return;
+      if (!msg.accepted) msg.accepted = {};
+      const acceptKey = `${kind}-${itemIdx}`;
+      if (msg.accepted[acceptKey]) return;
+
       if (kind === 'pei' && props.peiProjects?.[itemIdx]) {
         const p = props.peiProjects[itemIdx];
         state.projects.unshift(createProject({ ...p, estatus: 'propuesta_ia' }));
-        save(false);
+        msg.accepted[acceptKey] = true;
+        save(ui.activeModule === 'agent');
+        syncDrawerFeed();
         toast('Borrador incorporado a Cartera PEI (marcado Propuesta IA — No aprobada)');
       } else if (kind === 'pa' && props.actionItems?.[itemIdx]) {
         const a = props.actionItems[itemIdx];
         const code = `PA-${String(state.actionPlan.length + 1).padStart(2, '0')}`;
-        state.actionPlan.unshift(createActionItem({ ...a, codigo: code, estatus: 'propuesta_ia', estado: 'Propuesta IA — No aprobada' }));
-        save(false);
+        const linked = a.proyectoNombre
+          ? state.projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === String(a.proyectoNombre).trim().toLowerCase())
+          : null;
+        state.actionPlan.unshift(createActionItem({
+          ...a,
+          codigo: code,
+          proyectoId: linked ? linked.id : '',
+          proyectoNombre: linked ? linked.proyecto : (a.proyectoNombre || ''),
+          estatus: 'propuesta_ia',
+          estado: 'Propuesta IA — No aprobada'
+        }));
+        msg.accepted[acceptKey] = true;
+        save(ui.activeModule === 'agent');
+        syncDrawerFeed();
         toast('Borrador incorporado al Plan de Acción (No aprobado)');
       } else if (kind === 'opp' && props.opportunities?.[itemIdx]) {
         const o = props.opportunities[itemIdx];
         state.opportunities.unshift(createOpportunity({ ...o, estatus: 'propuesta_ia' }));
-        save(false);
+        msg.accepted[acceptKey] = true;
+        save(ui.activeModule === 'agent');
+        syncDrawerFeed();
         toast('Oportunidad incorporada como Propuesta IA — No aprobada');
       }
     },
@@ -906,9 +1167,7 @@ export function createAniApp() {
     },
     exportOppCsv() {
       api.closeDropdowns();
-      const head = ['FOCO', 'TÍTULO', 'EJE PND', 'MODO/FRENTE', 'COMPETENCIA ANI', 'DESCRIPCIÓN', 'EVIDENCIA', 'ESTATUS'];
-      const rows = state.opportunities.map((o) => [o.foco, o.titulo, o.ejePnd, o.modo, o.competencia, o.descripcion, o.evidencia, o.estatus]);
-      downloadFile('ANI_Oportunidades_2027-2030.csv', buildCsv(head, rows), 'text/csv;charset=utf-8');
+      downloadFile('ANI_Oportunidades_2027-2030.csv', buildOpportunitiesCsv(state.opportunities), 'text/csv;charset=utf-8');
     },
     importJson(ev) {
       api.closeDropdowns();
@@ -926,6 +1185,8 @@ export function createAniApp() {
           toast('Respaldo JSON importado con compatibilidad total');
         } catch (err) {
           toast(`Error al importar JSON: ${err.message}`);
+        } finally {
+          if (ev?.target) ev.target.value = '';
         }
       };
       reader.readAsText(file);
@@ -936,6 +1197,7 @@ export function createAniApp() {
       const reader = new FileReader();
       reader.onload = () => {
         const imported = importPeiFromCsv(String(reader.result || ''));
+        if (ev?.target) ev.target.value = '';
         if (!imported.length) {
           toast('No se encontraron filas válidas en el CSV');
           return;
@@ -943,6 +1205,23 @@ export function createAniApp() {
         state.projects.push(...imported);
         save(true);
         toast(`${imported.length} proyecto(s) importado(s) desde CSV`);
+      };
+      reader.readAsText(file);
+    },
+    importActionCsvFile(ev) {
+      const file = ev?.target?.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const imported = importActionPlanFromCsv(String(reader.result || ''), state.projects);
+        if (ev?.target) ev.target.value = '';
+        if (!imported.length) {
+          toast('No se encontraron actividades válidas en el CSV');
+          return;
+        }
+        state.actionPlan.push(...imported);
+        save(true);
+        toast(`${imported.length} actividad(es) importada(s) al Plan de Acción`);
       };
       reader.readAsText(file);
     },
@@ -959,6 +1238,7 @@ export function createAniApp() {
       renderActiveModule();
       if (state.updatedAt) updateSaveChip();
       api.refreshAgentStatus();
+      api.refreshRepoMedia(false);
 
       if (typeof document !== 'undefined') {
         document.addEventListener('click', (ev) => {

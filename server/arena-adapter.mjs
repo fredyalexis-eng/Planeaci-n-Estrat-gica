@@ -113,7 +113,14 @@ export class ArenaAdapter {
       ? 'anthropic'
       : 'openai';
     const defaultBase = format === 'anthropic' ? 'https://api.arena.ai' : 'https://api.arena.ai/v1';
-    const baseUrl = (this.env.ARENA_BASE_URL || defaultBase).trim().replace(/\/+$/, '');
+    const rawBase = (this.env.ARENA_BASE_URL || defaultBase).trim().replace(/\/+$/, '');
+    let baseUrl = defaultBase;
+    try {
+      const parsedBase = new URL(rawBase);
+      if (parsedBase.protocol === 'https:' && (parsedBase.hostname === 'api.arena.ai' || parsedBase.hostname.endsWith('.arena.ai'))) {
+        baseUrl = rawBase;
+      }
+    } catch { /* usar endpoint oficial por defecto */ }
     const model = (this.env.ARENA_MODEL || '').trim();
     const maxOutputTokens = Math.min(Math.max(parseInt(this.env.ARENA_MAX_OUTPUT_TOKENS || '2048', 10) || 2048, 256), 8192);
     const timeoutMs = Math.min(Math.max(parseInt(this.env.ARENA_TIMEOUT_MS || '45000', 10) || 45000, 5000), 120000);
@@ -301,7 +308,19 @@ export class ArenaAdapter {
       });
     }
 
-    const selectedModel = (modelOverride || cfg.model || 'coding-router-preview').trim();
+    let selectedModel = (modelOverride || cfg.model || '').trim();
+    if (!selectedModel) {
+      // Autodescubrir primer modelo directo habilitado en Arena API (caché 5 min)
+      const now = Date.now();
+      if (!this._cachedDirectModel || now > this._cachedDirectModelExp) {
+        const ver = await this.verifyConnection().catch(() => null);
+        if (ver?.ok && ver.directModels?.length > 0) {
+          this._cachedDirectModel = ver.directModels[0];
+          this._cachedDirectModelExp = now + 5 * 60 * 1000;
+        }
+      }
+      selectedModel = this._cachedDirectModel || 'coding-router-preview';
+    }
     const isAnthropic = cfg.format === 'anthropic';
     const url = isAnthropic
       ? `${cfg.gatewayRoot}/v1/messages`
@@ -322,32 +341,38 @@ export class ArenaAdapter {
       .slice(-12)
       .map((m) => ({ role: m.role, content: m.content.slice(0, 16000) }));
 
-    const payload = isAnthropic
-      ? {
+    const buildPayload = (useMaxCompletionTokens = false, omitTemp = false) => {
+      if (isAnthropic) {
+        const p = {
           model: selectedModel,
           max_tokens: cfg.maxOutputTokens,
-          temperature: cfg.temperature,
           system: systemPrompt,
           messages: sanitizedMessages
-        }
-      : {
-          model: selectedModel,
-          max_tokens: cfg.maxOutputTokens,
-          temperature: cfg.temperature,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...sanitizedMessages
-          ]
         };
+        if (!omitTemp) p.temperature = cfg.temperature;
+        return p;
+      }
+      const p = {
+        model: selectedModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...sanitizedMessages
+        ]
+      };
+      if (useMaxCompletionTokens) p.max_completion_tokens = cfg.maxOutputTokens;
+      else p.max_tokens = cfg.maxOutputTokens;
+      if (!omitTemp) p.temperature = cfg.temperature;
+      return p;
+    };
 
-    const doFetch = async () => {
+    const doFetch = async (bodyObj) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), cfg.timeoutMs);
       try {
         return await this.fetchImpl(url, {
           method: 'POST',
           headers,
-          body: JSON.stringify(payload),
+          body: JSON.stringify(bodyObj),
           signal: controller.signal
         });
       } finally {
@@ -356,14 +381,26 @@ export class ArenaAdapter {
     };
 
     let res;
+    let parsedErrBody = null;
     try {
-      res = await doFetch();
+      res = await doFetch(buildPayload(false, false));
       // Respetar Retry-After una sola vez si es breve (<= 5s), conforme a platform.arena.ai/docs/errors
       if (res.status === 429) {
         const retrySec = Number(res.headers.get('retry-after'));
         if (Number.isFinite(retrySec) && retrySec > 0 && retrySec <= 5) {
           await new Promise((r) => setTimeout(r, retrySec * 1000));
-          res = await doFetch();
+          res = await doFetch(buildPayload(false, false));
+        }
+      }
+      // Compatibilidad con modelos de razonamiento en formato OpenAI que exigen max_completion_tokens o sin temperature
+      if (!isAnthropic && res.status === 400) {
+        parsedErrBody = await res.json().catch(() => ({}));
+        const errMsg = String(parsedErrBody?.error?.message || '').toLowerCase();
+        const needsMaxComp = errMsg.includes('max_completion_tokens');
+        const badTemp = errMsg.includes('temperature');
+        if (needsMaxComp || badTemp) {
+          parsedErrBody = null;
+          res = await doFetch(buildPayload(needsMaxComp, needsMaxComp || badTemp));
         }
       }
     } catch (err) {
@@ -379,7 +416,7 @@ export class ArenaAdapter {
 
     const traceId = res.headers.get('x-arena-trace-id') || null;
     const routingMode = res.headers.get('x-arena-routing-mode') || 'direct';
-    const body = await res.json().catch(() => ({}));
+    const body = parsedErrBody || await res.json().catch(() => ({}));
 
     if (!res.ok) {
       throw mapArenaError(res.status, body, res.headers);

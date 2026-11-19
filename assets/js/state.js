@@ -192,7 +192,8 @@ export function defaultState() {
     customDocs: [],
     opportunities: [],
     actionPlan: [],
-    mediaAssets: []
+    mediaAssets: [],
+    mediaSlots: {}
   };
 }
 
@@ -271,6 +272,21 @@ export function migrateState(raw) {
   if (Array.isArray(raw.opportunities)) base.opportunities = raw.opportunities.map((o) => createOpportunity(o));
   if (Array.isArray(raw.actionPlan)) base.actionPlan = raw.actionPlan.map((a) => createActionItem(a));
   if (Array.isArray(raw.mediaAssets)) base.mediaAssets = raw.mediaAssets.map((m) => createMediaItem(m));
+  if (raw.mediaSlots && typeof raw.mediaSlots === 'object') {
+    const cleanSlots = {};
+    for (const [k, v] of Object.entries(raw.mediaSlots)) {
+      if (v && typeof v === 'object') {
+        const rawUrl = String(v.url ?? '').trim();
+        cleanSlots[k] = {
+          titulo: String(v.titulo ?? ''),
+          foco: normalizeFoco(v.foco),
+          url: rawUrl.startsWith('blob:') ? '' : rawUrl,
+          descripcion: String(v.descripcion ?? '')
+        };
+      }
+    }
+    base.mediaSlots = cleanSlots;
+  }
 
   return base;
 }
@@ -539,6 +555,10 @@ export function importPeiFromCsv(csvText) {
         scores[k] = Number.isFinite(val) && val >= 1 && val <= 5 ? val : 3;
       });
       const isIllustrative = /ejemplo ilustrativo/i.test(r[2] || '');
+      const statusCol = String(r[21] || '').trim();
+      const matchedStatus = statusCol
+        ? Object.entries(STATUS_LABELS).find(([k, v]) => k === statusCol || v.label.toLowerCase() === statusCol.toLowerCase())
+        : null;
       return createProject({
         foco: normalizeFoco(r[0]),
         objetivo: r[1] || '',
@@ -548,10 +568,64 @@ export function importPeiFromCsv(csvText) {
         detalle: r[5] || '',
         scores,
         doble: r[15] || '',
-        lineaBase: r[16] || '',
+        lineaBase: r[16] && r[16].trim() !== 'Pendiente' ? r[16] : '',
         ejePnd: r[19] || '',
         modo: r[20] || '',
-        estatus: isIllustrative ? 'ejemplo_ilustrativo' : 'en_construccion'
+        estatus: matchedStatus ? matchedStatus[0] : (isIllustrative ? 'ejemplo_ilustrativo' : 'en_construccion')
       });
     });
+}
+
+export function importActionPlanFromCsv(csvText, projects = []) {
+  const rows = parseCsvRows(csvText);
+  if (rows.length < 2) return [];
+  const dataRows = rows.slice(1);
+  return dataRows
+    .filter((r) => (r[1] || r[2] || r[3] || '').trim().length > 0)
+    .map((r) => {
+      const projLabel = String(r[2] || '').trim();
+      const linked = projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === projLabel.toLowerCase());
+      const pct = Math.max(0, Math.min(100, parseInt(r[16], 10) || 0));
+      const statusCol = String(r[17] || '').trim();
+      const matchedStatus = statusCol
+        ? Object.entries(STATUS_LABELS).find(([k, v]) => k === statusCol || v.label.toLowerCase() === statusCol.toLowerCase())
+        : null;
+      return createActionItem({
+        codigo: r[0] || '',
+        foco: normalizeFoco(r[1] || linked?.foco || ''),
+        proyectoId: linked ? linked.id : '',
+        proyectoNombre: linked ? linked.proyecto : projLabel,
+        actividad: r[3] || '',
+        entregable: r[4] || '',
+        indicador: r[5] || '',
+        unidad: r[6] || '',
+        lineaBase: r[7] || '',
+        m2027: r[8] || '',
+        m2028: r[9] || '',
+        m2029: r[10] || '',
+        m2030: r[11] || '',
+        responsable: r[12] || '',
+        presupuesto: r[13] || '',
+        riesgo: r[14] || '',
+        estado: r[15] || 'Formulada',
+        avance: pct,
+        estatus: matchedStatus ? matchedStatus[0] : 'en_construccion'
+      });
+    });
+}
+
+export function buildOpportunitiesCsv(opportunities = []) {
+  const head = ['N°', 'FOCO', 'EJE PND', 'OPORTUNIDAD ESTRATÉGICA', 'MODO / CAPACIDAD', 'ENCAJE COMPETENCIA ANI', 'ANÁLISIS ESTRATÉGICO', 'EVIDENCIA / FUENTE', 'ESTATUS'];
+  const rows = opportunities.map((o, i) => [
+    i + 1,
+    o.foco,
+    o.ejePnd,
+    o.titulo,
+    o.modo,
+    o.competencia,
+    o.descripcion,
+    o.evidencia,
+    STATUS_LABELS[o.estatus]?.label || o.estatus
+  ]);
+  return buildCsv(head, rows);
 }

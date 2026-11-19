@@ -19,7 +19,126 @@ import {
   projCategory,
   projHasBaselineIssue
 } from './state.js';
+import {
+  INSTITUTIONAL_VIDEO_SLOTS,
+  STRATEGIC_IMAGE_SLOTS,
+  sanitizeMediaUrl,
+  formatBytes
+} from '../../data/media-manifest.js';
 import { getBackendBase } from './agent-client.js';
+
+function renderSafeMediaPlayer(rawUrl, tipo, titulo, meta = {}) {
+  const safeUrl = sanitizeMediaUrl(rawUrl);
+  if (!safeUrl) {
+    return `<div class="callout callout-bad" style="margin:0;padding:8px 10px;font-size:12px">
+      <b>URL bloqueada por seguridad:</b> Use una ruta en <code>./assets/media/archivo</code> o una URL oficial <code>https://…</code>.
+    </div>`;
+  }
+  if (tipo === 'imagen') {
+    const caption = meta.caption || '';
+    const foco = meta.foco || 'F1+F2';
+    return `<figure class="media-figure">
+      <img
+        src="${esc(safeUrl)}"
+        alt="${esc(titulo)}"
+        class="media-img-preview"
+        loading="lazy"
+        data-media-src="${esc(safeUrl)}"
+        data-media-title="${esc(titulo)}"
+        data-media-caption="${esc(caption)}"
+        data-media-foco="${esc(foco)}"
+        onclick="ANI.openMediaLightboxFromEl(this)"
+        onerror="ANI.handleMediaError(this,'imagen')"
+      >
+      <div class="media-error-box" hidden>
+        <b>No fue posible cargar la imagen</b> (<code>${esc(safeUrl)}</code>). Verifique que el archivo exista en <code>assets/media/</code> o previsualice el archivo local.
+      </div>
+      <figcaption class="media-caption">
+        <span>Clic en la imagen para ampliar en pantalla completa</span>
+        <button type="button" class="btn btn-outline btn-xs no-print" data-media-src="${esc(safeUrl)}" data-media-title="${esc(titulo)}" data-media-caption="${esc(caption)}" data-media-foco="${esc(foco)}" onclick="ANI.openMediaLightboxFromEl(this)">Ampliar ⤢</button>
+      </figcaption>
+    </figure>`;
+  }
+
+  const yt = safeUrl.match(/^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+  if (yt) {
+    return `<div class="video-theater">
+      <iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0" title="${esc(titulo)}" class="video-embed" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+    </div>`;
+  }
+  const vimeo = safeUrl.match(/^https:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/)?(\d{6,12})/i);
+  if (vimeo) {
+    return `<div class="video-theater">
+      <iframe src="https://player.vimeo.com/video/${vimeo[1]}?dnt=1" title="${esc(titulo)}" class="video-embed" allow="fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+    </div>`;
+  }
+
+  return `<div class="video-theater">
+    <video
+      controls
+      playsinline
+      preload="metadata"
+      src="${esc(safeUrl)}"
+      class="video-player"
+      aria-label="${esc(titulo)}"
+      onerror="ANI.handleMediaError(this,'video')"
+    >
+      Su navegador no soporta reproducción HTML5 de video. <a href="${esc(safeUrl)}" download>Descargar video</a>.
+    </video>
+    <div class="media-error-box" hidden>
+      <b>Archivo de video no disponible en la ruta indicada</b> (<code>${esc(safeUrl)}</code>). Confirme que el archivo esté en <code>assets/media/</code> con formato <code>.mp4</code> o <code>.webm</code>, o use “Previsualizar archivo local”.
+    </div>
+  </div>`;
+}
+
+function formatAgentMarkdown(rawText) {
+  if (!rawText) return '';
+  const injectInline = (escapedLine) => escapedLine
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<i>$2</i>')
+    .replace(/\[([A-Z0-9][A-Z0-9._-]{2,40})\]/g, '<button type="button" class="cite-tag" data-cite="$1">[$1]</button>');
+
+  const lines = String(rawText).split(/\r?\n/);
+  const out = [];
+  let listType = null;
+  const closeList = () => {
+    if (listType) {
+      out.push(`</${listType}>`);
+      listType = null;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      closeList();
+      continue;
+    }
+    const hMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (hMatch) {
+      closeList();
+      out.push(`<h4 class="chat-heading">${injectInline(esc(hMatch[2]))}</h4>`);
+      continue;
+    }
+    const ulMatch = trimmed.match(/^[-*•]\s+(.+)$/);
+    if (ulMatch) {
+      if (listType !== 'ul') { closeList(); out.push('<ul class="chat-list">'); listType = 'ul'; }
+      out.push(`<li>${injectInline(esc(ulMatch[1]))}</li>`);
+      continue;
+    }
+    const olMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (olMatch) {
+      if (listType !== 'ol') { closeList(); out.push('<ol class="chat-list">'); listType = 'ol'; }
+      out.push(`<li>${injectInline(esc(olMatch[1]))}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(`<p class="chat-para">${injectInline(esc(trimmed))}</p>`);
+  }
+  closeList();
+  return out.join('');
+}
 
 /* ==================== MÓDULO 06: CARTERA PEI Y PRIORIZACIÓN ==================== */
 function renderScatterSvg(projects) {
@@ -64,12 +183,17 @@ function renderScatterSvg(projects) {
 }
 
 export function renderPei(state, ui) {
-  const { peiTab = 'fichas', filterFoco = '', searchProj = '', timerLabel = '20:00' } = ui;
+  const { peiTab = 'fichas', filterFoco = '', searchProj = '', sortProj = 'orden', timerLabel = '20:00' } = ui;
   const q = searchProj.trim().toLowerCase();
   const filtered = state.projects.filter((p) =>
     (!filterFoco || p.foco === filterFoco) &&
-    (!q || `${p.proyecto} ${p.objetivo} ${p.detalle} ${p.modo} ${p.ejePnd}`.toLowerCase().includes(q))
+    (!q || `${p.proyecto} ${p.objetivo} ${p.detalle} ${p.modo} ${p.ejePnd} ${p.doble}`.toLowerCase().includes(q))
   );
+  const sortedForTable = [...filtered];
+  if (sortProj === 'score_desc') sortedForTable.sort((a, b) => projScore(b).total - projScore(a).total);
+  else if (sortProj === 'imp_desc') sortedForTable.sort((a, b) => projScore(b).imp - projScore(a).imp);
+  else if (sortProj === 'eff_asc') sortedForTable.sort((a, b) => projScore(a).eff - projScore(b).eff);
+  else if (sortProj === 'foco') sortedForTable.sort((a, b) => (a.foco || 'Z').localeCompare(b.foco || 'Z'));
 
   const tabs = [
     ['fichas', `Fichas Editables (${state.projects.length})`],
@@ -131,7 +255,7 @@ export function renderPei(state, ui) {
               <button class="btn btn-danger btn-xs no-print" onclick="ANI.delProject('${p.id}')">Eliminar</button>
             </div>
 
-            ${baseErr ? `<div class="callout callout-bad" style="padding:8px 12px;font-size:12px"><b>Alerta R6:</b> Registró una meta numérica sin línea base oficial. Escriba <i>"Por definir — línea base pendiente"</i> hasta contar con línea base verificada.</div>` : ''}
+            <div class="callout callout-bad" data-proj-r6="${p.id}" style="padding:8px 12px;font-size:12px;${baseErr ? '' : 'display:none'}"><b>Alerta R6:</b> Registró una meta numérica sin línea base oficial. Escriba <i>"Por definir — línea base pendiente"</i> hasta contar con línea base verificada.</div>
 
             <div class="grid-3">
               <div>
@@ -228,6 +352,11 @@ export function renderPei(state, ui) {
           </div>
         </div>`}`;
   } else if (peiTab === 'tabla') {
+    const validCount = sortedForTable.filter((p) => projValid(p) && !projHasBaselineIssue(p)).length;
+    const f1Count = sortedForTable.filter((p) => p.foco === 'F1').length;
+    const f2Count = sortedForTable.filter((p) => p.foco === 'F2').length;
+    const dkCount = sortedForTable.filter((p) => p.doble?.trim().length >= 5).length;
+
     body = `
     <div class="card">
       <div class="card-header">
@@ -236,29 +365,77 @@ export function renderPei(state, ui) {
           <p class="muted">Vista ejecutiva consolidada de las 6 columnas obligatorias, doble llave F1↔F2, scoring y estatus.</p>
         </div>
         <div class="toolbar no-print" style="margin:0">
-          <button class="btn btn-teal btn-sm" onclick="ANI.exportPeiCsv()">Exportar CSV (Excel/Sheets)</button>
+          <button class="btn btn-teal btn-sm" onclick="ANI.addProject()">+ Proyecto</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importPeiCsvFile(event)"></label>
+          <button class="btn btn-navy btn-sm" onclick="ANI.exportPeiCsv()">Exportar CSV (18+ col)</button>
           <a class="btn btn-outline btn-sm" href="./02_Plantilla_Ejercicio_PEI_2027-2030.csv" download>Plantilla CSV original</a>
         </div>
       </div>
+
+      <div class="toolbar no-print" style="margin-bottom:10px">
+        <select aria-label="Filtrar tabla PEI por foco" onchange="ANI.setPeiFilter(this.value)">
+          <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos (${state.projects.length})</option>
+          <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>Solo F1 · Infraestructura</option>
+          <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>Solo F2 · Ruta social</option>
+        </select>
+        <select aria-label="Ordenar tabla PEI" onchange="ANI.setPeiSort(this.value)">
+          <option value="orden" ${sortProj === 'orden' ? 'selected' : ''}>Orden de registro</option>
+          <option value="score_desc" ${sortProj === 'score_desc' ? 'selected' : ''}>Mayor puntaje total</option>
+          <option value="imp_desc" ${sortProj === 'imp_desc' ? 'selected' : ''}>Mayor impacto estratégico</option>
+          <option value="eff_asc" ${sortProj === 'eff_asc' ? 'selected' : ''}>Menor esfuerzo relativo</option>
+          <option value="foco" ${sortProj === 'foco' ? 'selected' : ''}>Agrupar por foco (F1 → F2)</option>
+        </select>
+        <input type="search" value="${esc(searchProj)}" placeholder="Filtrar tabla por proyecto, objetivo, modo o doble llave…" style="flex:1;min-width:190px" oninput="ANI.setPeiSearch(this.value)">
+      </div>
+
+      <div class="table-summary-bar">
+        <span>Mostrando <b>${sortedForTable.length}</b> de ${state.projects.length} proyectos</span>
+        <span>· F1: <b>${f1Count}</b> · F2: <b>${f2Count}</b></span>
+        <span>· Filas válidas (6 col + R6): <b>${validCount}/${sortedForTable.length}</b></span>
+        <span>· Doble llave F1↔F2: <b>${dkCount}/${sortedForTable.length}</b></span>
+      </div>
+
       <div class="table-wrap">
         <table class="exec-table">
-          <thead><tr><th>Foco</th><th>Objetivos Estratégicos</th><th>Proyecto</th><th>Unidad</th><th>Línea Base / Meta 2030</th><th>Detalle y Doble Llave</th><th>Priorización</th></tr></thead>
+          <thead>
+            <tr>
+              <th>1. Foco</th>
+              <th>2. Objetivos Estratégicos</th>
+              <th>3. Proyecto</th>
+              <th>4. Unidad</th>
+              <th>5. Línea Base / Meta 2030</th>
+              <th>6. Detalle y Doble Llave</th>
+              <th>Priorización y Validez</th>
+              <th class="no-print">Acciones</th>
+            </tr>
+          </thead>
           <tbody>
-            ${state.projects.length
-              ? state.projects.map((p) => {
+            ${sortedForTable.length
+              ? sortedForTable.map((p) => {
                   const cat = projCategory(p);
                   const sc = projScore(p);
+                  const ok = projValid(p) && !projHasBaselineIssue(p);
+                  const r6 = projHasBaselineIssue(p);
                   return `<tr>
-                    <td><span class="badge ${p.foco === 'F1' ? 'badge-teal' : p.foco === 'F2' ? 'badge-amber' : 'badge-warn'}">${p.foco || '—'}</span></td>
-                    <td>${esc(p.objetivo || 'Pendiente')}</td>
+                    <td><span class="badge ${p.foco === 'F1' ? 'badge-teal' : p.foco === 'F2' ? 'badge-amber' : 'badge-warn'}">${p.foco || '—'}</span>${p.modo ? `<br><small class="muted">${esc(p.modo)}</small>` : ''}</td>
+                    <td>${esc(p.objetivo || 'Pendiente')}${p.ejePnd ? `<br><small class="muted">${esc(p.ejePnd)}</small>` : ''}</td>
                     <td><b>${esc(p.proyecto || 'Sin nombre')}</b><br>${statusBadge(p.estatus)}</td>
                     <td>${esc(p.unidad || '—')}</td>
-                    <td><small class="muted">LB:</small> ${esc(p.lineaBase || 'Pendiente')}<br><small class="muted">2030:</small> <b>${esc(p.meta || 'Por definir')}</b></td>
-                    <td>${esc(p.detalle || '—')}<br><small class="muted"><b>Doble llave:</b> ${esc(p.doble || 'Sin declarar')}</small></td>
-                    <td><span class="badge ${cat.cls}">${esc(cat.label)}</span><br><small class="muted">Imp ${sc.imp.toFixed(1)} · Esf ${sc.eff.toFixed(1)}</small></td>
+                    <td><small class="muted">LB:</small> ${esc(p.lineaBase || 'Pendiente')}<br><small class="muted">2030:</small> <b>${esc(p.meta || 'Por definir')}</b>${r6 ? `<br><span class="badge badge-bad">Alerta R6</span>` : ''}</td>
+                    <td style="max-width:280px">${esc(p.detalle || '—')}<br><small class="muted"><b>Doble llave:</b> ${esc(p.doble || 'Sin declarar')}</small></td>
+                    <td>
+                      <span class="badge ${cat.cls}">${esc(cat.label)} (${sc.total.toFixed(1)})</span><br>
+                      <small class="muted">Imp ${sc.imp.toFixed(1)} · Esf ${sc.eff.toFixed(1)}</small><br>
+                      <span class="badge ${ok ? 'badge-ok' : 'badge-warn'}">${ok ? '✓ Fila válida' : '○ Revisar'}</span>
+                    </td>
+                    <td class="no-print" style="white-space:nowrap">
+                      <button class="btn btn-outline btn-xs" onclick="ANI.focusProject('${p.id}')" title="Editar ficha">Editar</button>
+                      <button class="btn btn-soft btn-xs" onclick="ANI.addActionForProject('${p.id}')" title="Crear actividad en Plan de Acción">+ PA</button>
+                      <button class="btn btn-danger btn-xs" onclick="ANI.delProject('${p.id}')" title="Eliminar proyecto">✕</button>
+                    </td>
                   </tr>`;
                 }).join('')
-              : `<tr><td colspan="7" class="muted">Aún no hay proyectos en la tabla PEI.</td></tr>`}
+              : `<tr><td colspan="8" class="muted">${state.projects.length ? 'Ningún proyecto coincide con el filtro actual.' : 'Aún no hay proyectos en la tabla PEI. Use “+ Proyecto” o importe un CSV.'}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -331,12 +508,48 @@ export function renderPei(state, ui) {
 }
 
 /* ==================== MÓDULO 07: PLAN DE ACCIÓN 2027–2030 ==================== */
-export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
-  const items = state.actionPlan.filter((a) => !filterFoco || a.foco === filterFoco);
+export function renderActionPlan(state, paUi = {}) {
+  const paTab = typeof paUi === 'string' ? paUi : (paUi.paTab || 'fichas');
+  const filterFoco = typeof paUi === 'string' ? '' : (paUi.filterFoco || '');
+  const filterEstado = typeof paUi === 'string' ? '' : (paUi.filterEstado || '');
+  const searchPa = typeof paUi === 'string' ? '' : (paUi.searchPa || '');
+  const q = searchPa.trim().toLowerCase();
+
+  const items = state.actionPlan.filter((a) =>
+    (!filterFoco || a.foco === filterFoco) &&
+    (!filterEstado || a.estado === filterEstado) &&
+    (!q || `${a.codigo} ${a.actividad} ${a.entregable} ${a.proyectoNombre} ${a.responsable} ${a.indicador}`.toLowerCase().includes(q))
+  );
+
+  const avgProgress = items.length
+    ? Math.round(items.reduce((s, a) => s + (Number(a.avance) || 0), 0) / items.length)
+    : 0;
+  const coveredProjectIds = new Set(state.actionPlan.map((a) => a.proyectoId).filter(Boolean));
+  const estadosList = ['Formulada', 'Propuesta IA — No aprobada', 'Programada', 'En ejecución', 'En alerta', 'Cumplida'];
+
   const tabs = [
     ['fichas', `Actividades y Seguimiento (${state.actionPlan.length})`],
     ['cronograma', 'Cronograma Plurianual 2027–2030']
   ];
+
+  const filterBar = `
+    <div class="toolbar no-print" style="margin-bottom:10px">
+      <select aria-label="Filtrar PA por foco" onchange="ANI.setPaFilter(this.value)">
+        <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos (${state.actionPlan.length})</option>
+        <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>F1 · Infraestructura</option>
+        <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>F2 · Ruta social</option>
+      </select>
+      <select aria-label="Filtrar PA por estado" onchange="ANI.setPaEstadoFilter(this.value)">
+        <option value="" ${!filterEstado ? 'selected' : ''}>Todos los estados</option>
+        ${estadosList.map((st) => `<option value="${esc(st)}" ${filterEstado === st ? 'selected' : ''}>${esc(st)}</option>`).join('')}
+      </select>
+      <input type="search" value="${esc(searchPa)}" placeholder="Buscar actividad, proyecto PEI, entregable o responsable…" style="flex:1;min-width:190px" oninput="ANI.setPaSearch(this.value)">
+    </div>
+    <div class="table-summary-bar">
+      <span>Actividades: <b>${items.length}</b> de ${state.actionPlan.length}</span>
+      <span>· Avance promedio: <b>${avgProgress}%</b></span>
+      <span>· Cobertura Cartera PEI: <b>${coveredProjectIds.size}/${state.projects.length}</b> proyectos con PA</span>
+    </div>`;
 
   let body = '';
   if (paTab === 'fichas') {
@@ -348,19 +561,17 @@ export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
           <p class="muted">Programe actividades concretas, entregables, indicadores de gestión, metas anuales, responsables y recursos (sin inventar cifras sin soporte).</p>
         </div>
         <div class="toolbar no-print" style="margin:0">
-          <select onchange="ANI.setPaFilter(this.value)">
-            <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos</option>
-            <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>F1 · Infraestructura</option>
-            <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>F2 · Ruta social</option>
-          </select>
           <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Nueva actividad</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV PA <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)"></label>
           <button class="btn btn-outline btn-sm" onclick="ANI.exportActionCsv()">Exportar CSV PA</button>
         </div>
       </div>
 
+      ${filterBar}
+
       ${items.length
         ? items.map((a, idx) => `
-          <div class="entity-card">
+          <div class="entity-card" data-pa-card="${a.id}">
             <div class="entity-head">
               <span class="badge badge-navy">${esc(a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`)}</span>
               <span class="badge ${a.foco === 'F2' ? 'badge-amber' : a.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${a.foco || 'Sin foco'}</span>
@@ -410,8 +621,7 @@ export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
               <div>
                 <label class="field-label">Estado operativo</label>
                 <select onchange="ANI.setAction('${a.id}','estado',this.value)">
-                  ${['Formulada', 'Propuesta IA — No aprobada', 'Programada', 'En ejecución', 'En alerta', 'Cumplida']
-                    .map((st) => `<option value="${st}" ${a.estado === st ? 'selected' : ''}>${st}</option>`).join('')}
+                  ${estadosList.map((st) => `<option value="${st}" ${a.estado === st ? 'selected' : ''}>${st}</option>`).join('')}
                 </select>
               </div>
               <div>
@@ -422,8 +632,8 @@ export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
             </div>
           </div>`).join('')
         : `<div class="empty-state">
-            <h3>Plan de Acción 2027–2030 listo para programación</h3>
-            <p class="muted">Cree actividades directamente o derívelas desde cada proyecto de la Cartera PEI (botón “+ Actividad PA”).</p>
+            <h3>${state.actionPlan.length ? 'Ninguna actividad coincide con el filtro actual' : 'Plan de Acción 2027–2030 listo para programación'}</h3>
+            <p class="muted">Cree actividades directamente, impórtelas desde CSV o derívelas desde cada proyecto de la Cartera PEI (botón “+ Actividad PA”).</p>
             <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Crear primera actividad</button>
           </div>`}
     </div>`;
@@ -431,25 +641,52 @@ export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
     body = `
     <div class="card">
       <div class="card-header">
-        <h2>Cronograma Plurianual del Plan de Acción (2027–2030)</h2>
-        <button class="btn btn-teal btn-sm no-print" onclick="ANI.exportActionCsv()">Exportar CSV</button>
+        <div>
+          <h2>Cronograma Plurianual del Plan de Acción (2027–2030)</h2>
+          <p class="muted">Seguimiento consolidado por horizonte anual, responsable, entregable, indicador y avance físico.</p>
+        </div>
+        <div class="toolbar no-print" style="margin:0">
+          <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Actividad</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV PA <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)"></label>
+          <button class="btn btn-navy btn-sm" onclick="ANI.exportActionCsv()">Exportar CSV PA</button>
+        </div>
       </div>
+      ${filterBar}
       <div class="table-wrap">
         <table class="exec-table">
-          <thead><tr><th>Foco</th><th>Proyecto PEI → Actividad</th><th>Responsable</th><th>2027 (Corto)</th><th>2028 (Mediano)</th><th>2029 (Mediano)</th><th>2030 (Largo)</th><th>Estado</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Código / Foco</th>
+              <th>Proyecto PEI → Actividad</th>
+              <th>Indicador y Responsable</th>
+              <th>2027 (Corto)</th>
+              <th>2028 (Mediano)</th>
+              <th>2029 (Mediano)</th>
+              <th>2030 (Largo)</th>
+              <th>Estado y Avance</th>
+              <th class="no-print">Acciones</th>
+            </tr>
+          </thead>
           <tbody>
-            ${state.actionPlan.length
-              ? state.actionPlan.map((a) => `<tr>
-                  <td><span class="badge ${a.foco === 'F2' ? 'badge-amber' : 'badge-teal'}">${a.foco || '—'}</span></td>
-                  <td><small class="muted">${esc(a.proyectoNombre || 'Sin proyecto PEI')}</small><br><b>${esc(a.actividad || 'Sin nombre')}</b><br><small class="muted">Entregable: ${esc(a.entregable || '—')}</small></td>
-                  <td>${esc(a.responsable || 'Por asignar')}</td>
+            ${items.length
+              ? items.map((a, idx) => `<tr>
+                  <td><b>${esc(a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`)}</b><br><span class="badge ${a.foco === 'F2' ? 'badge-amber' : a.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${a.foco || '—'}</span></td>
+                  <td><small class="muted">${esc(a.proyectoNombre || 'Sin proyecto PEI')}</small><br><b>${esc(a.actividad || 'Sin nombre')}</b><br><small class="muted">Entregable: ${esc(a.entregable || '—')}</small><br>${statusBadge(a.estatus)}</td>
+                  <td>${esc(a.indicador || '—')}${a.unidad ? ` <small class="muted">(${esc(a.unidad)})</small>` : ''}<br><small class="muted"><b>Resp.:</b> ${esc(a.responsable || 'Por asignar')}</small></td>
                   <td>${esc(a.m2027 || '—')}</td>
                   <td>${esc(a.m2028 || '—')}</td>
                   <td>${esc(a.m2029 || '—')}</td>
                   <td>${esc(a.m2030 || '—')}</td>
-                  <td><span class="badge badge-slate">${esc(a.estado)} · ${a.avance}%</span></td>
+                  <td>
+                    <span class="badge ${a.estado === 'Cumplida' ? 'badge-ok' : a.estado === 'En alerta' ? 'badge-bad' : 'badge-slate'}">${esc(a.estado)}</span><br>
+                    <small class="muted">Avance: <b>${a.avance}%</b></small>
+                  </td>
+                  <td class="no-print" style="white-space:nowrap">
+                    <button class="btn btn-outline btn-xs" onclick="ANI.focusAction('${a.id}')">Editar</button>
+                    <button class="btn btn-danger btn-xs" onclick="ANI.delActionItem('${a.id}')">✕</button>
+                  </td>
                 </tr>`).join('')
-              : `<tr><td colspan="8" class="muted">Sin actividades registradas aún.</td></tr>`}
+              : `<tr><td colspan="9" class="muted">${state.actionPlan.length ? 'Ninguna actividad coincide con el filtro actual.' : 'Sin actividades registradas aún.'}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -464,55 +701,255 @@ export function renderActionPlan(state, paTab = 'fichas', filterFoco = '') {
 }
 
 /* ==================== MÓDULO 08: CENTRO AUDIOVISUAL Y RECURSOS ==================== */
-export function renderMedia(state) {
-  const renderAssetPreview = (m) => {
-    const u = (m.url || '').trim();
-    if (!u) return `<p class="muted">Ruta pendiente de configurar.</p>`;
-    if (m.tipo === 'imagen') {
-      return `<img src="${esc(u)}" alt="${esc(m.titulo)}" style="width:100%;max-height:260px;object-fit:contain;border-radius:8px;border:1px solid var(--line);background:#f8fafc">`;
+export function renderMedia(state, mediaUi = {}) {
+  const {
+    mediaTab = 'todo',
+    repoMedia = { ok: false, videos: [], images: [], files: [] },
+    sessionBlobs = {}
+  } = mediaUi;
+
+  const repoVideos = Array.isArray(repoMedia?.videos) ? repoMedia.videos : [];
+  const repoImages = Array.isArray(repoMedia?.images) ? repoMedia.images : [];
+  const usedRepoUrls = new Set();
+
+  // Resolver URL activa para cada uno de los 2 slots de video institucional:
+  // 1) archivo local en sesión (blob:) -> 2) ruta/URL configurada por usuario -> 3) archivo autodetectado en assets/media/
+  const resolveSlotSource = (slot, pool, idx) => {
+    const cfg = state.mediaSlots?.[slot.slotId] || {};
+    const blob = sessionBlobs[slot.slotId];
+    if (blob?.url) {
+      return { url: blob.url, sourceLabel: `Vista previa local (${blob.name} · ${formatBytes(blob.size)})`, isBlob: true, cfg };
     }
-    const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    if (yt) {
-      return `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="${esc(m.titulo)}" style="width:100%;height:240px;border:0;border-radius:8px" allowfullscreen loading="lazy"></iframe>`;
+    if (cfg.url?.trim()) {
+      usedRepoUrls.add(cfg.url.trim());
+      return { url: cfg.url.trim(), sourceLabel: 'Ruta/URL vinculada', isBlob: false, cfg };
     }
-    return `<video controls preload="metadata" src="${esc(u)}" style="width:100%;max-height:260px;border-radius:8px;background:#000"></video>`;
+    const exactName = slot.suggestedFile.split('/').pop().toLowerCase();
+    const exactMatch = pool.find((f) => f.filename.toLowerCase() === exactName && !usedRepoUrls.has(f.url));
+    if (exactMatch) {
+      usedRepoUrls.add(exactMatch.url);
+      return { url: exactMatch.url, sourceLabel: `Repositorio (${exactMatch.filename} · ${formatBytes(exactMatch.sizeBytes)})`, isBlob: false, cfg };
+    }
+    const autoMatch = pool.filter((f) => !usedRepoUrls.has(f.url))[0];
+    if (autoMatch && idx < pool.length) {
+      usedRepoUrls.add(autoMatch.url);
+      return { url: autoMatch.url, sourceLabel: `Autodetectado en assets/media (${autoMatch.filename} · ${formatBytes(autoMatch.sizeBytes)})`, isBlob: false, cfg };
+    }
+    return { url: '', sourceLabel: `Pendiente en ${slot.suggestedFile}`, isBlob: false, cfg };
   };
 
-  return `
+  const resolvedVideoSlots = INSTITUTIONAL_VIDEO_SLOTS.map((slot, i) => ({
+    slot,
+    ...resolveSlotSource(slot, repoVideos, i)
+  }));
+  const resolvedImageSlots = STRATEGIC_IMAGE_SLOTS.map((slot, i) => ({
+    slot,
+    ...resolveSlotSource(slot, repoImages, i)
+  }));
+
+  const extraRepoVideos = repoVideos.filter((v) => !usedRepoUrls.has(v.url));
+  const extraRepoImages = repoImages.filter((im) => !usedRepoUrls.has(im.url));
+
+  const readyVideosCount = resolvedVideoSlots.filter((v) => v.url).length
+    + extraRepoVideos.length
+    + state.mediaAssets.filter((m) => m.tipo === 'video' && m.url?.trim()).length;
+  const readyImagesCount = resolvedImageSlots.filter((im) => im.url).length
+    + extraRepoImages.length
+    + state.mediaAssets.filter((m) => m.tipo === 'imagen' && m.url?.trim()).length;
+
+  const tabs = [
+    ['todo', 'Vista Integral'],
+    ['videos', `Videos Institucionales (${readyVideosCount}/2+)`],
+    ['imagenes', `Imágenes y Láminas (${readyImagesCount})`],
+    ['canvas', 'Canvas Ejecutivo 2 Focos']
+  ];
+
+  const statusBanner = `
+  <div class="callout ${repoVideos.length + repoImages.length > 0 ? 'callout-teal' : 'callout-warn'}" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div>
+      <b>Inventario verificado de <code>assets/media/</code>:</b>
+      <b>${repoVideos.length}</b> video(s) y <b>${repoImages.length}</b> imagen(es) en repositorio ·
+      <b>1</b> lienzo interactivo preservado (<code>03_Canvas_2_Focos_ANI.html</code>).
+      ${repoVideos.length === 0 && repoImages.length === 0
+        ? `<br><span style="font-size:12.2px">Sin material genérico de relleno: al copiar los 2 videos institucionales (<code>.mp4</code>/<code>.webm</code>) o imágenes estratégicas (<code>.png</code>/<code>.jpg</code>/<code>.webp</code>/<code>.svg</code>) en <code>assets/media/</code>, los reproductores y la galería los activan automáticamente con soporte de streaming HTTP 206. También puede probarlos al instante con <b>Previsualizar archivo local</b>.</span>`
+        : ''}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" class="no-print">
+      <button class="btn btn-outline btn-xs" onclick="ANI.refreshRepoMedia(true)">↻ Escanear assets/media</button>
+      <button class="btn btn-teal btn-xs" onclick="ANI.addMediaItem()">+ Registrar recurso adicional</button>
+    </div>
+  </div>`;
+
+  const videosSection = `
   <div class="card">
     <div class="card-header">
       <div>
-        <h2>Canvas Ejecutivo Original Preservado — 2 Focos ANI 2027–2030</h2>
-        <p class="muted">Recurso gráfico interactivo existente en el repositorio (<code>03_Canvas_2_Focos_ANI.html</code>), integrado sin alteraciones.</p>
+        <h2>Sala de Videos Institucionales ANI (2 Reproductores Principales)</h2>
+        <p class="muted">Reproducción HTML5 nativa con control de avance (HTTP Range 206), pantalla completa, autodetección en <code>assets/media/</code> y previsualización local inmediata.</p>
       </div>
-      <a class="btn btn-navy btn-sm no-print" href="./03_Canvas_2_Focos_ANI.html" target="_blank" rel="noopener">Abrir pantalla completa ↗</a>
+      <span class="badge ${readyVideosCount >= 2 ? 'badge-ok' : 'badge-warn'}">${Math.min(readyVideosCount, 2)}/2 videos activos</span>
     </div>
-    <iframe class="media-frame" src="./03_Canvas_2_Focos_ANI.html" title="Canvas Ejecutivo 2 Focos ANI 2027-2030"></iframe>
-  </div>
+    <div class="grid-2">
+      ${resolvedVideoSlots.map(({ slot, url, sourceLabel, isBlob, cfg }) => {
+        const title = cfg.titulo?.trim() || slot.defaultTitle;
+        const foco = cfg.foco || slot.defaultFoco;
+        const desc = cfg.descripcion?.trim() || slot.summary;
+        return `<article class="media-slot-card">
+          <div class="entity-head" style="margin-bottom:8px">
+            <span class="badge badge-navy">Video 0${slot.order}</span>
+            <span class="badge ${foco === 'F2' ? 'badge-amber' : foco === 'F1' ? 'badge-teal' : 'badge-slate'}">${esc(foco)}</span>
+            <span class="badge ${url ? 'badge-ok' : 'badge-warn'}">${url ? (isBlob ? 'Sesión local' : 'Listo para reproducir') : 'Pendiente de archivo'}</span>
+          </div>
+          <h3 style="margin-bottom:4px">${esc(title)}</h3>
+          <p class="muted" style="font-size:12.2px;margin-bottom:10px">${esc(desc)}</p>
 
+          ${url
+            ? renderSafeMediaPlayer(url, 'video', title, { foco, caption: desc })
+            : `<div class="media-placeholder">
+                <div class="media-placeholder-icon" aria-hidden="true">▶</div>
+                <b>Reproductor HTML5 preparado — archivo pendiente</b>
+                <p class="muted" style="font-size:12px;margin:4px 0 10px">Copie el video oficial en <code>${esc(slot.suggestedFile)}</code> (o cualquier <code>.mp4</code>/<code>.webm</code> en <code>assets/media/</code>) o ábralo localmente para validar el reproductor.</p>
+                <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap" class="no-print">
+                  <label class="btn btn-navy btn-xs" style="cursor:pointer">
+                    Previsualizar video local
+                    <input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" hidden onchange="ANI.previewSlotFile('${slot.slotId}',event)">
+                  </label>
+                </div>
+              </div>`}
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <small class="muted"><b>Origen:</b> ${esc(sourceLabel)}</small>
+            <div style="display:flex;gap:6px" class="no-print">
+              ${url ? `<label class="btn btn-outline btn-xs" style="cursor:pointer">Cambiar archivo local<input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" hidden onchange="ANI.previewSlotFile('${slot.slotId}',event)"></label>` : ''}
+              ${isBlob ? `<button type="button" class="btn btn-outline btn-xs" onclick="ANI.clearSlotBlob('${slot.slotId}')">Quitar local</button>` : ''}
+            </div>
+          </div>
+
+          <details class="guide-box no-print" style="margin-top:8px">
+            <summary>Configurar título, foco o ruta/URL del Video 0${slot.order}</summary>
+            <div class="grid-2" style="margin-top:6px">
+              <div>
+                <label class="field-label" style="margin-top:0">Título institucional</label>
+                <input type="text" value="${esc(cfg.titulo || '')}" placeholder="${esc(slot.defaultTitle)}" oninput="ANI.setMediaSlot('${slot.slotId}','titulo',this.value)">
+              </div>
+              <div>
+                <label class="field-label" style="margin-top:0">Foco estratégico</label>
+                <select onchange="ANI.setMediaSlot('${slot.slotId}','foco',this.value,true)">
+                  <option value="F1" ${foco === 'F1' ? 'selected' : ''}>F1 · Infraestructura</option>
+                  <option value="F2" ${foco === 'F2' ? 'selected' : ''}>F2 · Ruta social</option>
+                  <option value="F1+F2" ${foco === 'F1+F2' ? 'selected' : ''}>Institucional (F1 + F2)</option>
+                </select>
+              </div>
+            </div>
+            <label class="field-label">Ruta en repositorio (<code>./assets/media/…</code>) o URL oficial HTTPS</label>
+            <input type="text" value="${esc(cfg.url || '')}" placeholder="./${esc(slot.suggestedFile)} o https://…" onchange="ANI.setMediaSlot('${slot.slotId}','url',this.value,true)">
+            ${repoVideos.length ? `<div style="margin-top:6px"><small class="muted">Archivos detectados: </small>${repoVideos.map((rv) => `<button type="button" class="btn btn-soft btn-xs" style="margin:2px" onclick="ANI.setMediaSlot('${slot.slotId}','url','${esc(rv.url)}',true)">${esc(rv.filename)}</button>`).join('')}</div>` : ''}
+            <label class="field-label">Descripción ejecutiva / fuente</label>
+            <input type="text" value="${esc(cfg.descripcion || '')}" placeholder="Dependencia ANI, fecha y contexto estratégico" oninput="ANI.setMediaSlot('${slot.slotId}','descripcion',this.value)">
+          </details>
+        </article>`;
+      }).join('')}
+    </div>
+
+    ${extraRepoVideos.length ? `
+      <h3 style="margin-top:16px">Videos Adicionales Detectados en <code>assets/media/</code> (${extraRepoVideos.length})</h3>
+      <div class="grid-2" style="margin-top:8px">
+        ${extraRepoVideos.map((v) => `<article class="media-slot-card">
+          <div class="entity-head"><span class="badge badge-navy">Video repositorio</span><small class="muted">${esc(v.filename)} · ${formatBytes(v.sizeBytes)}</small></div>
+          <h3>${esc(v.title)}</h3>
+          ${renderSafeMediaPlayer(v.url, 'video', v.title)}
+        </article>`).join('')}
+      </div>` : ''}
+  </div>`;
+
+  const imagesSection = `
   <div class="card">
     <div class="card-header">
       <div>
-        <h2>Videos, Imágenes y Láminas Institucionales ANI</h2>
-        <p class="muted">No se incluyen imágenes ni videos genéricos de relleno. Coloque archivos oficiales en <code>assets/media/</code> o vincule URLs institucionales verificadas.</p>
+        <h2>Galería de Imágenes, Mapas y Láminas Estratégicas ANI</h2>
+        <p class="muted">Visualización en alta resolución con visor ampliable (lightbox), autodetección en <code>assets/media/</code> y trazabilidad documental.</p>
       </div>
-      <button class="btn btn-teal btn-sm no-print" onclick="ANI.addMediaItem()">+ Vincular video o imagen oficial</button>
+      <div class="toolbar no-print" style="margin:0">
+        <button class="btn btn-teal btn-xs" onclick="ANI.addMediaItem('imagen')">+ Añadir lámina o mapa</button>
+      </div>
     </div>
 
-    ${state.mediaAssets.length
-      ? `<div class="grid-2">${state.mediaAssets.map((m) => `
-          <div class="entity-card" style="margin:0">
+    <div class="grid-2">
+      ${resolvedImageSlots.map(({ slot, url, sourceLabel, isBlob, cfg }) => {
+        const title = cfg.titulo?.trim() || slot.defaultTitle;
+        const foco = cfg.foco || slot.defaultFoco;
+        const desc = cfg.descripcion?.trim() || slot.summary;
+        return `<article class="media-slot-card">
+          <div class="entity-head" style="margin-bottom:8px">
+            <span class="badge badge-teal">Lámina 0${slot.order}</span>
+            <span class="badge">${esc(foco)}</span>
+            ${slot.citation ? citeBadge(slot.citation) : ''}
+            <span style="flex:1"></span>
+            <span class="badge ${url ? 'badge-ok' : 'badge-warn'}">${url ? 'Cargada' : 'Pendiente'}</span>
+          </div>
+          <h3 style="margin-bottom:4px">${esc(title)}</h3>
+          <p class="muted" style="font-size:12.2px;margin-bottom:10px">${esc(desc)}</p>
+
+          ${url
+            ? renderSafeMediaPlayer(url, 'imagen', title, { foco, caption: desc })
+            : `<div class="media-placeholder">
+                <div class="media-placeholder-icon" aria-hidden="true">▣</div>
+                <b>Visor de lámina estratégica preparado</b>
+                <p class="muted" style="font-size:12px;margin:4px 0 10px">Guarde la imagen oficial en <code>${esc(slot.suggestedFile)}</code> (<code>.png</code>, <code>.jpg</code>, <code>.webp</code>, <code>.svg</code>) o previsualícela localmente.</p>
+                <label class="btn btn-outline btn-xs no-print" style="cursor:pointer">
+                  Previsualizar imagen local
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" hidden onchange="ANI.previewSlotFile('${slot.slotId}',event)">
+                </label>
+              </div>`}
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <small class="muted"><b>Origen:</b> ${esc(sourceLabel)}</small>
+            <div style="display:flex;gap:6px" class="no-print">
+              ${url ? `<label class="btn btn-outline btn-xs" style="cursor:pointer">Cambiar imagen local<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" hidden onchange="ANI.previewSlotFile('${slot.slotId}',event)"></label>` : ''}
+              ${isBlob ? `<button type="button" class="btn btn-outline btn-xs" onclick="ANI.clearSlotBlob('${slot.slotId}')">Quitar local</button>` : ''}
+            </div>
+          </div>
+
+          <details class="guide-box no-print" style="margin-top:8px">
+            <summary>Configurar título o ruta/URL de Lámina 0${slot.order}</summary>
+            <label class="field-label" style="margin-top:6px">Título de la lámina o mapa</label>
+            <input type="text" value="${esc(cfg.titulo || '')}" placeholder="${esc(slot.defaultTitle)}" oninput="ANI.setMediaSlot('${slot.slotId}','titulo',this.value)">
+            <label class="field-label">Ruta en repositorio (<code>./assets/media/…</code>) o URL oficial HTTPS</label>
+            <input type="text" value="${esc(cfg.url || '')}" placeholder="./${esc(slot.suggestedFile)} o https://…" onchange="ANI.setMediaSlot('${slot.slotId}','url',this.value,true)">
+            ${repoImages.length ? `<div style="margin-top:6px"><small class="muted">Imágenes detectadas: </small>${repoImages.map((ri) => `<button type="button" class="btn btn-soft btn-xs" style="margin:2px" onclick="ANI.setMediaSlot('${slot.slotId}','url','${esc(ri.url)}',true)">${esc(ri.filename)}</button>`).join('')}</div>` : ''}
+            <label class="field-label">Descripción / fuente</label>
+            <input type="text" value="${esc(cfg.descripcion || '')}" placeholder="Fuente documental, escala o nota metodológica" oninput="ANI.setMediaSlot('${slot.slotId}','descripcion',this.value)">
+          </details>
+        </article>`;
+      }).join('')}
+    </div>
+
+    ${extraRepoImages.length ? `
+      <h3 style="margin-top:16px">Imágenes Estratégicas Adicionales en <code>assets/media/</code> (${extraRepoImages.length})</h3>
+      <div class="grid-3" style="margin-top:8px">
+        ${extraRepoImages.map((im) => `<article class="media-slot-card">
+          <div class="entity-head"><span class="badge badge-teal">Imagen repositorio</span><small class="muted">${formatBytes(im.sizeBytes)}</small></div>
+          <h3 style="font-size:13.5px">${esc(im.title)}</h3>
+          ${renderSafeMediaPlayer(im.url, 'imagen', im.title, { caption: im.filename })}
+        </article>`).join('')}
+      </div>` : ''}
+
+    ${state.mediaAssets.length ? `
+      <h3 style="margin-top:16px">Recursos Audiovisuales Adicionales Vinculados (${state.mediaAssets.length})</h3>
+      <div class="grid-2" style="margin-top:8px">
+        ${state.mediaAssets.map((m) => `
+          <div class="media-slot-card">
             <div class="entity-head">
-              <span class="badge ${m.tipo === 'video' ? 'badge-navy' : 'badge-teal'}">${m.tipo === 'video' ? 'Video institucional' : 'Imagen / Mapa'}</span>
+              <span class="badge ${m.tipo === 'video' ? 'badge-navy' : 'badge-teal'}">${m.tipo === 'video' ? 'Video adicional' : 'Imagen / Mapa'}</span>
               <span class="badge">${esc(m.foco)}</span>
               <span style="flex:1"></span>
               <button class="btn btn-danger btn-xs no-print" onclick="ANI.delMediaItem('${m.id}')">Quitar</button>
             </div>
-            ${m.url ? `<div style="margin-bottom:10px">${renderAssetPreview(m)}</div>` : ''}
+            ${m.url ? `<div style="margin-bottom:10px">${renderSafeMediaPlayer(m.url, m.tipo, m.titulo || 'Recurso ANI', { foco: m.foco, caption: m.fuente })}</div>` : ''}
             <div class="grid-2">
               <div><label class="field-label">Tipo</label>
                 <select onchange="ANI.setMedia('${m.id}','tipo',this.value,true)">
-                  <option value="video" ${m.tipo === 'video' ? 'selected' : ''}>Video (.mp4, .webm, YouTube)</option>
+                  <option value="video" ${m.tipo === 'video' ? 'selected' : ''}>Video (.mp4, .webm, YouTube, Vimeo)</option>
                   <option value="imagen" ${m.tipo === 'imagen' ? 'selected' : ''}>Imagen / Lámina (.png, .jpg, .svg, .webp)</option>
                 </select>
               </div>
@@ -525,19 +962,28 @@ export function renderMedia(state) {
               </div>
             </div>
             <label class="field-label">Título del recurso institucional</label>
-            <input type="text" value="${esc(m.titulo)}" placeholder="Ej.: Video Estratégico ANI 2027–2030 / Lámina Iniciativas PND" oninput="ANI.setMedia('${m.id}','titulo',this.value)">
-            <label class="field-label">Ruta en repositorio o URL oficial</label>
-            <input type="text" value="${esc(m.url)}" placeholder="Ej.: ./assets/media/estrategia-ani.mp4 o https://…" onchange="ANI.setMedia('${m.id}','url',this.value,true)">
+            <input type="text" value="${esc(m.titulo)}" placeholder="Ej.: Mapa Corredores Férreos ANI / Infografía Ruta Social" oninput="ANI.setMedia('${m.id}','titulo',this.value)">
+            <label class="field-label">Ruta en repositorio (<code>./assets/media/…</code>) o URL oficial HTTPS</label>
+            <input type="text" value="${esc(m.url)}" placeholder="Ej.: ./assets/media/mapa-ferreo.png o https://…" onchange="ANI.setMedia('${m.id}','url',this.value,true)">
             <label class="field-label">Fuente / dependencia y descripción</label>
-            <input type="text" value="${esc(m.fuente)}" placeholder="Oficina de Comunicaciones / Planeación ANI · Fecha" oninput="ANI.setMedia('${m.id}','fuente',this.value)">
-          </div>`).join('')}</div>`
-      : `<div class="callout callout-warn" style="margin:0">
-          <b>Estado verificado de activos multimedia:</b> El repositorio actual contiene <b>0 archivos de video</b> y <b>0 archivos de imagen</b>
-          (las 2 láminas fuente citadas en <code>01_Marco_Estrategico_ANI_2027-2030.md</code> fueron transcritas pero no almacenadas como imagen).
-          Al incorporar archivos en <code>assets/media/</code> o registrarlos con el botón superior, se reproducirán aquí de forma nativa.
-        </div>`}
-  </div>
+            <input type="text" value="${esc(m.fuente)}" placeholder="Oficina de Planeación / Comunicaciones ANI · Fecha" oninput="ANI.setMedia('${m.id}','fuente',this.value)">
+          </div>`).join('')}
+      </div>` : ''}
+  </div>`;
 
+  const canvasSection = `
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2>Canvas Ejecutivo Original Preservado — 2 Focos ANI 2027–2030</h2>
+        <p class="muted">Recurso gráfico interactivo existente en el repositorio (<code>03_Canvas_2_Focos_ANI.html</code>), integrado sin alteraciones.</p>
+      </div>
+      <a class="btn btn-navy btn-sm no-print" href="./03_Canvas_2_Focos_ANI.html" target="_blank" rel="noopener">Abrir pantalla completa ↗</a>
+    </div>
+    <iframe class="media-frame" src="./03_Canvas_2_Focos_ANI.html" title="Canvas Ejecutivo 2 Focos ANI 2027-2030"></iframe>
+  </div>`;
+
+  const downloadsSection = `
   <div class="card">
     <h2>Descarga Directa de Archivos Originales del Repositorio</h2>
     <div class="grid-4">
@@ -548,6 +994,19 @@ export function renderMedia(state) {
       </div>`).join('')}
     </div>
   </div>`;
+
+  let content = '';
+  if (mediaTab === 'videos') content = videosSection;
+  else if (mediaTab === 'imagenes') content = imagesSection;
+  else if (mediaTab === 'canvas') content = canvasSection + downloadsSection;
+  else content = videosSection + imagesSection + canvasSection + downloadsSection;
+
+  return `
+  <div class="subtabs no-print">
+    ${tabs.map(([id, lbl]) => `<button class="subtab ${mediaTab === id ? 'active' : ''}" onclick="ANI.setMediaTab('${id}')">${esc(lbl)}</button>`).join('')}
+  </div>
+  ${statusBanner}
+  ${content}`;
 }
 
 /* ==================== MÓDULO 09: HERRAMIENTAS DE CONSULTA Y AGENTE IA ==================== */
@@ -565,16 +1024,16 @@ export function renderChatFeedHtml(messages) {
       return `<div class="chat-msg user"><div style="font-size:10.5px;opacity:.75;margin-bottom:3px">Consulta · ${esc(msg.modeLabel || msg.mode || '')}</div>${esc(msg.content)}</div>`;
     }
     const r = msg.payload || {};
-    const formattedAnswer = r.answer
-      ? esc(r.answer)
-          .replace(/\[([A-Z0-9][A-Z0-9._-]{2,40})\]/g, '<button type="button" class="cite-tag" data-cite="$1">[$1]</button>')
-          .replace(/\n/g, '<br>')
-      : '';
+    const accepted = msg.accepted || {};
+    const formattedAnswer = formatAgentMarkdown(r.answer || '');
 
     const citations = Array.isArray(r.verifiedCitations) ? r.verifiedCitations : [];
+    const consulted = Array.isArray(r.consultedSources) ? r.consultedSources : [];
     const props = r.proposals || { peiProjects: [], actionItems: [], opportunities: [] };
 
-    const peiCards = (props.peiProjects || []).map((p, pIdx) => `
+    const peiCards = (props.peiProjects || []).map((p, pIdx) => {
+      const done = Boolean(accepted[`pei-${pIdx}`]);
+      return `
       <div class="proposal-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="badge badge-ai">Propuesta Proyecto PEI — No aprobada</span>
@@ -583,31 +1042,44 @@ export function renderChatFeedHtml(messages) {
         <b style="display:block;margin:6px 0 3px;color:var(--navy-900)">${esc(p.proyecto)}</b>
         <div class="muted">Unidad: ${esc(p.unidad)} · Meta 2030: ${esc(p.meta)} · Doble llave: ${esc(p.doble || 'Por definir')}</div>
         <p class="muted" style="margin:5px 0">${esc(p.detalle)}</p>
-        <button class="btn btn-navy btn-xs no-print" onclick="ANI.acceptProposal(${mIdx},'pei',${pIdx})">+ Incorporar como borrador a Cartera PEI</button>
-      </div>`).join('');
+        ${done
+          ? `<span class="badge badge-ok">✓ Incorporado como borrador en Cartera PEI</span>`
+          : `<button class="btn btn-navy btn-xs no-print" onclick="ANI.acceptProposal(${mIdx},'pei',${pIdx})">+ Incorporar como borrador a Cartera PEI</button>`}
+      </div>`;
+    }).join('');
 
-    const paCards = (props.actionItems || []).map((a, aIdx) => `
+    const paCards = (props.actionItems || []).map((a, aIdx) => {
+      const done = Boolean(accepted[`pa-${aIdx}`]);
+      return `
       <div class="proposal-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="badge badge-ai">Propuesta Plan de Acción — No aprobada</span>
           <span class="badge ${a.foco === 'F2' ? 'badge-amber' : 'badge-teal'}">${esc(a.foco)}</span>
         </div>
         <b style="display:block;margin:6px 0 3px;color:var(--navy-900)">${esc(a.actividad)}</b>
-        <div class="muted">Entregable: ${esc(a.entregable)} · Indicador: ${esc(a.indicador)} · Responsable: ${esc(a.responsable)}</div>
-        <button class="btn btn-navy btn-xs no-print" style="margin-top:6px" onclick="ANI.acceptProposal(${mIdx},'pa',${aIdx})">+ Incorporar como borrador al Plan de Acción</button>
-      </div>`).join('');
+        <div class="muted">Proyecto PEI: ${esc(a.proyectoNombre || 'Por vincular')} · Entregable: ${esc(a.entregable)} · Indicador: ${esc(a.indicador)} · Responsable: ${esc(a.responsable)}</div>
+        ${done
+          ? `<span class="badge badge-ok" style="margin-top:6px">✓ Incorporado como borrador en Plan de Acción</span>`
+          : `<button class="btn btn-navy btn-xs no-print" style="margin-top:6px" onclick="ANI.acceptProposal(${mIdx},'pa',${aIdx})">+ Incorporar como borrador al Plan de Acción</button>`}
+      </div>`;
+    }).join('');
 
-    const oppCards = (props.opportunities || []).map((o, oIdx) => `
+    const oppCards = (props.opportunities || []).map((o, oIdx) => {
+      const done = Boolean(accepted[`opp-${oIdx}`]);
+      return `
       <div class="proposal-card">
         <span class="badge badge-ai">Propuesta Oportunidad — No aprobada</span>
         <b style="display:block;margin:6px 0 3px;color:var(--navy-900)">[${esc(o.foco)}] ${esc(o.titulo)}</b>
         <p class="muted" style="margin:4px 0">${esc(o.descripcion)}</p>
-        <button class="btn btn-navy btn-xs no-print" onclick="ANI.acceptProposal(${mIdx},'opp',${oIdx})">+ Incorporar a Matriz de Oportunidades</button>
-      </div>`).join('');
+        ${done
+          ? `<span class="badge badge-ok">✓ Incorporada en Matriz de Oportunidades</span>`
+          : `<button class="btn btn-navy btn-xs no-print" onclick="ANI.acceptProposal(${mIdx},'opp',${oIdx})">+ Incorporar a Matriz de Oportunidades</button>`}
+      </div>`;
+    }).join('');
 
     const auditHtml = r.auditReport?.findings?.length
       ? `<div style="margin-top:10px">
-          <b style="font-size:12px;color:var(--navy-900)">Verificación reglada R1–R6 (${r.auditReport.summary.critical} críticos · ${r.auditReport.summary.warnings} alertas):</b>
+          <b style="font-size:12px;color:var(--navy-900)">Verificación reglada R1–R6 (${r.auditReport.summary.critical} críticos · ${r.auditReport.summary.warnings} alertas · ${r.auditReport.summary.passed || 0} cumplidas):</b>
           ${r.auditReport.findings.slice(0, 6).map((f) => `
             <div class="citation-block" style="border-left:3px solid ${f.severity === 'bad' ? 'var(--bad-600)' : f.severity === 'warn' ? 'var(--amber-500)' : 'var(--teal-600)'}">
               <b>${esc(f.rule)} — ${esc(f.title)}</b> ${citeBadge(f.citation)}<br>
@@ -616,20 +1088,27 @@ export function renderChatFeedHtml(messages) {
         </div>`
       : '';
 
+    const consultedHtml = r.generationMode === 'arena_api_live' && consulted.length
+      ? `<div style="margin-top:8px;font-size:11.5px" class="muted">
+          <b>Contexto documental inspeccionado (${consulted.length}):</b>
+          ${consulted.map((cs) => citeBadge(cs.id)).join(' ')}
+        </div>`
+      : '';
+
     return `<div class="chat-msg assistant">
       <div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:8px">
         <span class="badge ${r.generationMode === 'arena_api_live' ? 'badge-ok' : 'badge-warn'}">
           ${r.generationMode === 'arena_api_live'
-            ? `Arena API en vivo · ${esc(r.arenaMeta?.reportedModel || 'modelo')}`
+            ? `Arena API en vivo · ${esc(r.arenaMeta?.reportedModel || 'modelo')}${r.arenaMeta?.routingMode ? ` (${esc(r.arenaMeta.routingMode)})` : ''}`
             : 'Recuperación documental verificada (Arena API pendiente de clave)'}
         </span>
-        ${r.arenaMeta?.traceId ? `<span class="badge">Trace: ${esc(r.arenaMeta.traceId)}</span>` : ''}
+        ${r.arenaMeta?.traceId ? `<span class="badge" title="Identificador de trazabilidad X-Arena-Trace-ID">Trace: ${esc(r.arenaMeta.traceId)}</span>` : ''}
       </div>
 
       ${r.statusNotice ? `<div class="callout callout-warn" style="padding:9px 12px;font-size:12.2px">${esc(r.statusNotice)}</div>` : ''}
-      ${r.error ? `<div class="callout callout-bad" style="padding:9px 12px;font-size:12.2px"><b>Error Arena API (${esc(r.error.code)}):</b> ${esc(r.error.message)}<br>${esc(r.error.userGuidance || '')}</div>` : ''}
+      ${r.error ? `<div class="callout callout-bad" style="padding:9px 12px;font-size:12.2px"><b>Error Arena API (${esc(r.error.code)}):</b> ${esc(r.error.message)}<br>${esc(r.error.userGuidance || '')}${r.error.billingUrl ? ` <a href="${esc(r.error.billingUrl)}" target="_blank" rel="noopener">Gestionar facturación Arena ↗</a>` : ''}</div>` : ''}
       ${r.governanceBadge ? `<div style="margin-bottom:8px"><span class="badge badge-ai">${esc(r.governanceBadge)}</span></div>` : ''}
-      ${formattedAnswer ? `<div style="margin-bottom:10px">${formattedAnswer}</div>` : ''}
+      ${formattedAnswer ? `<div class="chat-answer-body" style="margin-bottom:10px">${formattedAnswer}</div>` : ''}
       ${peiCards}${paCards}${oppCards}
       ${auditHtml}
       ${citations.length ? `
@@ -644,6 +1123,7 @@ export function renderChatFeedHtml(messages) {
               <pre>${esc(String(c.excerpt || '').slice(0, 520))}${String(c.excerpt || '').length > 520 ? '…' : ''}</pre>
             </div>`).join('')}
         </div>` : ''}
+      ${consultedHtml}
     </div>`;
   }).join('');
 }
@@ -654,6 +1134,7 @@ export function renderAgentModule(state, agentUi) {
     statusData = null,
     verifyResult = null,
     activeMode = 'consulta',
+    selectedModel = '',
     messages = [],
     busy = false,
     searchQuery = '',
@@ -664,6 +1145,7 @@ export function renderAgentModule(state, agentUi) {
   const arena = statusData?.arena || {};
   const kb = statusData?.knowledge || {};
   const isLiveReady = arena.status === 'configured_ready';
+  const discoveredModels = Array.isArray(verifyResult?.directModels) ? verifyResult.directModels : [];
 
   const modeOptions = [
     ['consulta', '1. Consulta documental trazable'],
@@ -696,17 +1178,25 @@ export function renderAgentModule(state, agentUi) {
         <p class="muted" style="font-size:12px">
           <b>Proveedor único:</b> ${esc(arena.providerLabel || 'Arena API')}<br>
           <b>Endpoint:</b> <code>${esc(arena.completionsEndpoint || 'https://api.arena.ai/v1/chat/completions')}</code><br>
-          <b>Modelo:</b> ${esc(arena.configuredModel || 'Por definir en .env')}<br>
+          <b>Modelo:</b> ${esc(selectedModel || arena.configuredModel || 'Autodetección vía /v1/models')}<br>
           <b>Acervo indexado:</b> ${kb.totalRepoChunks || 0} secciones en ${kb.totalRepoFiles || 4} archivos base + sesión activa
         </p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">
           <button class="btn btn-outline btn-xs" onclick="ANI.verifyArena()">Verificar conexión</button>
           <button class="btn btn-soft btn-xs" onclick="ANI.refreshAgentStatus()">Actualizar estado</button>
+          <button class="btn btn-outline btn-xs" onclick="ANI.reloadKnowledge()" title="Reindexar carpeta knowledge/ y archivos base">Reindexar acervo</button>
         </div>
+        ${discoveredModels.length ? `
+          <label class="field-label" style="margin-top:6px">Modelo Arena habilitado (<code>/v1/models</code>)</label>
+          <select onchange="ANI.setAgentModel(this.value)" style="margin-bottom:6px">
+            <option value="" ${!selectedModel ? 'selected' : ''}>Predeterminado (${esc(arena.configuredModel || discoveredModels[0])})</option>
+            ${discoveredModels.map((mid) => `<option value="${esc(mid)}" ${selectedModel === mid ? 'selected' : ''}>${esc(mid)}</option>`).join('')}
+          </select>` : ''}
         ${verifyResult ? `<div class="callout ${verifyResult.ok ? 'callout-teal' : 'callout-warn'}" style="padding:8px 10px;font-size:11.8px;margin-top:8px">
-          <b>Verificación:</b> ${esc(verifyResult.status)}<br>
+          <b>Verificación:</b> ${esc(verifyResult.status)}${verifyResult.modelsCount ? ` (${verifyResult.modelsCount} modelos)` : ''}<br>
           ${esc(verifyResult.recommendedAction || verifyResult.message || '')}
           ${verifyResult.userGuidance ? `<br><span class="muted">${esc(verifyResult.userGuidance)}</span>` : ''}
+          ${verifyResult.billingUrl ? `<br><a href="${esc(verifyResult.billingUrl)}" target="_blank" rel="noopener">Gestionar facturación Arena API ↗</a>` : ''}
         </div>` : ''}
 
         <details class="guide-box">
@@ -735,7 +1225,7 @@ export function renderAgentModule(state, agentUi) {
             <select id="agentModeSelect" style="flex:1;min-width:210px;padding:6px 10px" onchange="ANI.setAgentMode(this.value)">
               ${modeOptions.map(([id, lbl]) => `<option value="${id}" ${activeMode === id ? 'selected' : ''}>${esc(lbl)}</option>`).join('')}
             </select>
-            ${messages.length ? `<button type="button" class="btn btn-outline btn-xs" onclick="ANI.clearChat()">Limpiar</button>` : ''}
+            ${messages.length ? `<button type="button" class="btn btn-outline btn-xs" onclick="ANI.exportChatTrace()">Exportar trazabilidad (.md)</button><button type="button" class="btn btn-outline btn-xs" onclick="ANI.clearChat()">Limpiar</button>` : ''}
           </div>
           <div class="chat-composer-row">
             <textarea id="agentInput" placeholder="Escriba su pregunta estratégica, análisis PND–ANI o solicitud de propuesta PEI / Plan de Acción…" ${busy ? 'disabled' : ''}></textarea>

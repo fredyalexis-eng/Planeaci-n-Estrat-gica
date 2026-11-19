@@ -17,8 +17,14 @@ El workflow `.github/workflows/pages.yml` publica exclusivamente los recursos es
 5. **Análisis de Oportunidades** — Recomendaciones estructurales R1–R6 y matriz de oportunidades PND–ANI convertible en borradores PEI.
 6. **Cartera PEI y Priorización** — Contrato de 6 columnas, Doble Llave F1↔F2, scoring multicriterio 1–5 (9 criterios), mapa cartesiano y 4 cuadrantes Impacto–Esfuerzo, ranking y cronómetro de taller 20 min.
 7. **Plan de Acción 2027–2030** — Desagregación operativa por proyecto PEI, indicadores de gestión, metas anuales 2027–2030, responsables y cronograma plurianual.
-8. **Centro Audiovisual y Recursos** — `03_Canvas_2_Focos_ANI.html` embebido, descarga de archivos originales y gestor de videos/imágenes oficiales ANI.
-9. **Agente Estratégico IA y Consulta** — Integración con backend seguro (adaptador Arena API), buscador documental BM25 en español con citas verificables `[ID]` y auditor automático R1–R6.
+8. **Centro Audiovisual y Recursos** — Sala de 2 reproductores HTML5 institucionales (con streaming HTTP `206 Range` y autodetección en `assets/media/`), galería de láminas/mapas estratégicos con visor ampliable (*lightbox*), previsualización local inmediata y `03_Canvas_2_Focos_ANI.html` embebido.
+9. **Agente Estratégico IA y Consulta** — Integración exclusiva con Arena API (`https://api.arena.ai`, autodetección de modelos vía `/v1/models`, `X-Arena-Trace-ID` y verificación estricta de citas `[ID]`), buscador documental BM25 en español y auditor automático R1–R6.
+
+## 🎬 Carga de videos e imágenes institucionales
+
+Coloque los archivos oficiales en `assets/media/` (sin renombrar código; `GET /api/media` los detecta automáticamente):
+- Videos principales: `assets/media/video_institucional_01.mp4` y `assets/media/video_institucional_02.mp4` (o cualquier `.mp4`/`.webm`).
+- Láminas estratégicas: `assets/media/lamina_01_iniciativas_estrategicas.png`, `assets/media/lamina_02_tabla_pei_2027_2030.png` y mapas/infografías adicionales (`.png`, `.jpg`, `.webp`, `.svg`).
 
 ## 🚀 Ejecución con servidor y Agente Estratégico (Node.js ≥ 20, sin dependencias externas)
 

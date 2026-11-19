@@ -14,7 +14,7 @@ const BACKEND_URL_KEY = 'ani_strategy_lab_backend_url';
 export function getBackendBase() {
   try {
     const saved = (localStorage.getItem(BACKEND_URL_KEY) || '').trim().replace(/\/+$/, '');
-    if (saved && /^https?:\/\//i.test(saved)) return saved;
+    if (saved && /^https:\/\//i.test(saved)) return saved;
   } catch { /* ignore */ }
   return '';
 }
@@ -32,7 +32,7 @@ export function setBackendBase(url) {
   return clean;
 }
 
-function apiUrl(endpoint) {
+export function apiUrl(endpoint) {
   const base = getBackendBase();
   return base ? `${base}${endpoint}` : `.${endpoint}`;
 }
@@ -334,8 +334,29 @@ export async function runAudit(workspace) {
   }
 }
 
-export async function fetchCitationChunk(chunkId) {
+export async function fetchRepoMedia() {
   try {
+    const res = await fetch(apiUrl('/api/media'), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data?.ok) return data;
+  } catch { /* modo estático */ }
+  return { ok: false, directory: 'assets/media', total: 0, videos: [], images: [], files: [] };
+}
+
+export async function fetchCitationChunk(chunkId, workspace = null) {
+  try {
+    if (workspace) {
+      const postRes = await fetch(apiUrl('/api/agent/citation'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ id: chunkId, workspace })
+      });
+      if (postRes.ok) {
+        const postData = await postRes.json();
+        if (postData?.chunk) return postData.chunk;
+      }
+    }
     const res = await fetch(apiUrl(`/api/agent/knowledge?id=${encodeURIComponent(chunkId)}`), {
       headers: { Accept: 'application/json' }
     });
@@ -394,12 +415,12 @@ export async function fetchCitationChunk(chunkId) {
   return STATIC_FALLBACK_CHUNKS.find((c) => c.id === chunkId) || null;
 }
 
-export async function sendAgentMessage({ message, mode, workspace, history }) {
+export async function sendAgentMessage({ message, mode, workspace, history, model = '' }) {
   try {
     const res = await fetch(apiUrl('/api/agent/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ message, mode, workspace, history })
+      body: JSON.stringify({ message, mode, workspace, history, model })
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();

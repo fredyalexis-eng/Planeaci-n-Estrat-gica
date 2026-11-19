@@ -753,15 +753,30 @@ export function renderPndDocs(state, subtab = 'ejes', activeDoc = 'pnd') {
 }
 
 /* ==================== MÓDULO 05: OPORTUNIDADES Y RECOMENDACIONES ==================== */
-export function renderOpportunities(state, filterFoco = '') {
+export function renderOpportunities(state, filterFoco = '', oppTab = 'todo') {
   const list = state.opportunities.filter((o) => !filterFoco || o.foco === filterFoco || o.foco === 'F1+F2');
-  const axisOptions = ['<option value="">Por vincular…</option>']
-    .concat(state.pndAxes.map((a) => {
+  const standardAxisVals = new Set(['', ...state.pndAxes.map((a) => `Eje ${a.numero}`)]);
+  const buildAxisSelectOptions = (selectedVal = '') => {
+    const clean = String(selectedVal || '');
+    const opts = [`<option value="" ${clean === '' ? 'selected' : ''}>Por vincular…</option>`];
+    for (const a of state.pndAxes) {
+      const val = `Eje ${a.numero}`;
       const label = `Eje ${a.numero}${a.nombre.trim() ? ': ' + a.nombre.trim().slice(0, 40) : ''}`;
-      return `<option value="Eje ${a.numero}">${esc(label)}</option>`;
-    }));
+      opts.push(`<option value="${esc(val)}" ${clean === val ? 'selected' : ''}>${esc(label)}</option>`);
+    }
+    if (clean && !standardAxisVals.has(clean)) {
+      opts.push(`<option value="${esc(clean)}" selected>${esc(clean)}</option>`);
+    }
+    return opts.join('');
+  };
 
-  return `
+  const tabs = [
+    ['todo', `Vista Integral`],
+    ['tabla', `Tabla Ejecutiva PND × ANI (${list.length})`],
+    ['recomendaciones', `Recomendaciones R1–R6 (${RECOMMENDATIONS.length})`]
+  ];
+
+  const recsHtml = `
   <div class="card">
     <div class="card-header">
       <div>
@@ -783,22 +798,78 @@ export function renderOpportunities(state, filterFoco = '') {
           <p class="muted"><b>Justificación:</b> ${esc(r.justificacion)}<br><b>Beneficio:</b> ${esc(r.beneficio)}<br><b>Riesgo:</b> ${esc(r.riesgo)}</p>
         </div>`).join('')}
     </div>
-  </div>
+  </div>`;
 
+  const toolbarHtml = `
+    <div class="toolbar no-print" style="margin:0">
+      <select onchange="ANI.setOppFilter(this.value)" aria-label="Filtrar oportunidades por foco">
+        <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos (${state.opportunities.length})</option>
+        <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>F1 · Infraestructura</option>
+        <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>F2 · Ruta social</option>
+      </select>
+      <button class="btn btn-teal btn-sm" onclick="ANI.addOpportunity()">+ Nueva oportunidad</button>
+      ${state.opportunities.length ? `<button class="btn btn-outline btn-sm" onclick="ANI.exportOpportunitiesCsv()">Exportar CSV</button>` : ''}
+    </div>`;
+
+  const tableHtml = `
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2>Tabla Ejecutiva de Oportunidades (PND × Competencias ANI)</h2>
+        <p class="muted">Consolidado tabular verificable con promoción directa a la Cartera PEI 2027–2030.</p>
+      </div>
+      ${toolbarHtml}
+    </div>
+    ${list.length
+      ? `<div class="table-wrap">
+          <table class="exec-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Foco</th>
+                <th>Eje PND</th>
+                <th>Oportunidad estratégica</th>
+                <th>Modo / Capacidad</th>
+                <th>Encaje ANI</th>
+                <th>Análisis y evidencia</th>
+                <th>Estatus</th>
+                <th class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${list.map((o, idx) => `<tr>
+                <td><b>${idx + 1}</b></td>
+                <td><span class="badge ${o.foco === 'F2' ? 'badge-amber' : 'badge-teal'}">${esc(o.foco)}</span></td>
+                <td>${esc(o.ejePnd || 'Por vincular')}</td>
+                <td><b>${esc(o.titulo || 'En formulación')}</b></td>
+                <td>${esc(o.modo || '—')}</td>
+                <td><span class="badge ${/R2/i.test(o.competencia) ? 'badge-warn' : 'badge-navy'}">${esc(o.competencia || '—')}</span></td>
+                <td style="max-width:280px">${esc(o.descripcion || '—')}${o.evidencia ? `<br><span class="muted">Fuente: ${esc(o.evidencia)}</span>` : ''}</td>
+                <td>${statusBadge(o.estatus)}</td>
+                <td class="no-print" style="white-space:nowrap">
+                  <button class="btn btn-navy btn-xs" onclick="ANI.promoteOppToPei('${o.id}')" title="Crear borrador en Cartera PEI">→ PEI</button>
+                  <button class="btn btn-outline btn-xs" onclick="ANI.setOppTab('todo')" title="Editar ficha">Editar</button>
+                  <button class="btn btn-danger btn-xs" onclick="ANI.deleteOpportunity('${o.id}')" title="Eliminar">✕</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`
+      : `<div class="empty-state">
+          <h3>Sin oportunidades en este filtro</h3>
+          <p class="muted">Registre oportunidades o derívelas desde los 7 Ejes del PND (Módulo 04).</p>
+          <button class="btn btn-teal btn-sm" onclick="ANI.addOpportunity()">+ Registrar oportunidad</button>
+        </div>`}
+  </div>`;
+
+  const fichasHtml = `
   <div class="card">
     <div class="card-header">
       <div>
         <h2>Matriz de Oportunidades Estratégicas (PND × Competencias ANI)</h2>
         <p class="muted">Identifique oportunidades concretas y conviértalas en 1 clic en borradores trazables de la Cartera PEI.</p>
       </div>
-      <div class="toolbar no-print" style="margin:0">
-        <select onchange="ANI.setOppFilter(this.value)">
-          <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos</option>
-          <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>F1 · Infraestructura</option>
-          <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>F2 · Ruta social</option>
-        </select>
-        <button class="btn btn-teal btn-sm" onclick="ANI.addOpportunity()">+ Nueva oportunidad</button>
-      </div>
+      ${toolbarHtml}
     </div>
     ${list.length
       ? list.map((o) => `
@@ -823,7 +894,7 @@ export function renderOpportunities(state, filterFoco = '') {
             <div>
               <label class="field-label">Eje PND origen</label>
               <select onchange="ANI.setOpp('${o.id}','ejePnd',this.value)">
-                ${axisOptions.map((opt) => opt.replace(`value="${o.ejePnd}"`, `value="${o.ejePnd}" selected`)).join('')}
+                ${buildAxisSelectOptions(o.ejePnd)}
               </select>
             </div>
             <div>
@@ -852,4 +923,15 @@ export function renderOpportunities(state, filterFoco = '') {
           <button class="btn btn-teal btn-sm" onclick="ANI.addOpportunity()">+ Registrar primera oportunidad</button>
         </div>`}
   </div>`;
+
+  let content = '';
+  if (oppTab === 'tabla') content = tableHtml;
+  else if (oppTab === 'recomendaciones') content = recsHtml;
+  else content = fichasHtml + recsHtml;
+
+  return `
+  <div class="subtabs no-print">
+    ${tabs.map(([id, label]) => `<button class="subtab ${oppTab === id ? 'active' : ''}" onclick="ANI.setOppTab('${id}')">${esc(label)}</button>`).join('')}
+  </div>
+  ${content}`;
 }

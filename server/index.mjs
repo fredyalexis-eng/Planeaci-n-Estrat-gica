@@ -6,6 +6,7 @@
  * para Arena API (https://api.arena.ai) mediante variables de entorno.
  */
 import http from 'node:http';
+import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,9 +35,17 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.ico': 'image/x-icon',
   '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
   '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+  '.ogg': 'video/ogg',
+  '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
   '.pdf': 'application/pdf'
 };
+
+const VIDEO_EXTS = new Set(['.mp4', '.m4v', '.webm', '.ogv', '.ogg', '.mov']);
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif']);
 
 const ALLOWED_ROOT_FILES = new Set([
   'index.html',
@@ -204,6 +213,40 @@ export async function createAppServer({
         });
       }
 
+      if (pathname === '/api/media' && req.method === 'GET') {
+        const mediaDir = path.join(repoRoot, 'assets', 'media');
+        const files = [];
+        try {
+          const entries = await fs.readdir(mediaDir, { withFileTypes: true });
+          for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+            if (!entry.isFile() || entry.name.startsWith('.')) continue;
+            const ext = path.extname(entry.name).toLowerCase();
+            const isVideo = VIDEO_EXTS.has(ext);
+            const isImage = IMAGE_EXTS.has(ext);
+            if (!isVideo && !isImage) continue;
+            const st = await fs.stat(path.join(mediaDir, entry.name));
+            files.push({
+              filename: entry.name,
+              title: path.basename(entry.name, ext).replace(/[_-]+/g, ' '),
+              tipo: isVideo ? 'video' : 'imagen',
+              ext,
+              mime: MIME_TYPES[ext] || 'application/octet-stream',
+              sizeBytes: st.size,
+              updatedAt: st.mtime.toISOString(),
+              url: `./assets/media/${encodeURIComponent(entry.name)}`
+            });
+          }
+        } catch { /* assets/media ausente o vacía */ }
+        return sendJson(res, 200, {
+          ok: true,
+          directory: 'assets/media',
+          total: files.length,
+          videos: files.filter((f) => f.tipo === 'video'),
+          images: files.filter((f) => f.tipo === 'imagen'),
+          files
+        });
+      }
+
       if (pathname === '/api/agent/knowledge' && req.method === 'GET') {
         const chunkId = reqUrl.searchParams.get('id');
         if (chunkId) {
@@ -212,6 +255,15 @@ export async function createAppServer({
           return sendJson(res, 200, { ok: true, chunk: found });
         }
         return sendJson(res, 200, { ok: true, ...knowledge.getSummary() });
+      }
+
+      if (pathname === '/api/agent/citation' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const chunkId = String(body?.id || '').trim();
+        const allMap = knowledge.getAllChunksMap(body?.workspace || null);
+        const found = allMap.get(chunkId);
+        if (!found) return sendJson(res, 404, { ok: false, message: `Fuente [${chunkId}] no encontrada.` });
+        return sendJson(res, 200, { ok: true, chunk: found });
       }
 
       if (pathname === '/api/agent/knowledge/reload' && req.method === 'POST') {
@@ -290,9 +342,9 @@ export async function createAppServer({
             modeLabel: AGENT_MODES[mode].label,
             statusNotice: 'El adaptador oficial de Arena API está preparado en el servidor, pero aún no tiene una clave ARENA_API_KEY configurada. No se simula ninguna respuesta generativa ni se usa otro proveedor sin su autorización. A continuación se entregan los pasajes exactos recuperados del acervo documental indexado y la verificación reglada de trazabilidad.',
             answer: null,
-            verifiedCitations: rawHits.slice(0, 6).map((c) => ({
+            verifiedCitations: (rawHits.length ? rawHits : retrieved).slice(0, 6).map((c) => ({
               id: c.id,
-              score: c.score,
+              score: c.score ?? 0,
               docTitle: c.docTitle,
               section: c.section,
               sourceFile: c.sourceFile,
@@ -433,14 +485,56 @@ export async function createAppServer({
         }
         const ext = path.extname(fullPath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        const data = await fs.readFile(fullPath);
-        res.writeHead(200, {
+        const totalSize = stat.size;
+        const rangeHeader = req.headers.range;
+
+        // Soporte HTTP 206 Partial Content para streaming y adelanto fluido de videos institucionales
+        if (rangeHeader && (VIDEO_EXTS.has(ext) || ext === '.mp3' || ext === '.pdf')) {
+          const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+          if (!match) {
+            res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+            res.end();
+            return;
+          }
+          const start = match[1] ? parseInt(match[1], 10) : 0;
+          const end = match[2] ? Math.min(parseInt(match[2], 10), totalSize - 1) : totalSize - 1;
+          if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= totalSize) {
+            res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+            res.end();
+            return;
+          }
+          res.writeHead(206, {
+            'Content-Type': contentType,
+            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': end - start + 1,
+            'Cache-Control': 'public, max-age=300'
+          });
+          if (req.method === 'HEAD') {
+            res.end();
+          } else {
+            createReadStream(fullPath, { start, end }).pipe(res);
+          }
+          return;
+        }
+
+        const baseHeaders = {
           'Content-Type': contentType,
-          'Content-Length': data.length,
+          'Content-Length': totalSize,
           'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300'
-        });
-        if (req.method === 'HEAD') res.end();
-        else res.end(data);
+        };
+        if (VIDEO_EXTS.has(ext) || ext === '.mp3') {
+          baseHeaders['Accept-Ranges'] = 'bytes';
+        }
+        res.writeHead(200, baseHeaders);
+        if (req.method === 'HEAD') {
+          res.end();
+        } else if (VIDEO_EXTS.has(ext) || totalSize > 1024 * 1024) {
+          createReadStream(fullPath).pipe(res);
+        } else {
+          const data = await fs.readFile(fullPath);
+          res.end(data);
+        }
       } catch {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Archivo no encontrado');
