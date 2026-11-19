@@ -8,7 +8,10 @@ import {
   PEI_FILL_RULES,
   PA_FILL_RULES,
   REPO_DOCUMENTS,
-  AGENT_QUICK_PROMPTS
+  AGENT_QUICK_PROMPTS,
+  OFFICIAL_PEI_PORTFOLIO,
+  OFFICIAL_PEI_PRIORITY_GROUPS,
+  DB_SEED_RECORDS
 } from '../../data/knowledge-base.js';
 import {
   esc,
@@ -210,6 +213,7 @@ export function renderPei(state, ui) {
   const tabs = [
     ['fichas', `Fichas Editables (${state.projects.length})`],
     ['tabla', 'Tabla Contractual PEI (6 columnas)'],
+    ['matriz', `Matriz Institucional (${OFFICIAL_PEI_PORTFOLIO.length})`],
     ['priorizacion', 'Priorización, Matriz y Taller 20 min']
   ];
 
@@ -224,6 +228,8 @@ export function renderPei(state, ui) {
     <div class="card">
       <div class="toolbar no-print" style="margin-bottom:8px">
         <button class="btn btn-teal" onclick="ANI.addProject()">+ Nuevo proyecto PEI</button>
+        <button class="btn btn-navy btn-sm" onclick="ANI.importOfficialPortfolio()">+ Cargar Cartera Base (14)</button>
+        <button class="btn btn-soft btn-sm" onclick="ANI.importDbRecords()">+ Cargar Base Área GC (DB)</button>
         <select aria-label="Filtrar por foco" onchange="ANI.setPeiFilter(this.value)">
           <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos</option>
           <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>Solo F1 · Infraestructura</option>
@@ -464,6 +470,78 @@ export function renderPei(state, ui) {
               : `<tr><td colspan="8" class="muted">${state.projects.length ? 'Ningún proyecto coincide con el filtro actual.' : 'Aún no hay proyectos en la tabla PEI. Use “+ Proyecto” o importe un CSV.'}</td></tr>`}
           </tbody>
         </table>
+      </div>
+    </div>`;
+  } else if (peiTab === 'matriz') {
+    const visibleOfficial = OFFICIAL_PEI_PORTFOLIO.filter((p) =>
+      (!filterFoco || p.foco === filterFoco) &&
+      (!q || `${p.proyecto} ${p.objetivo} ${p.detalle} ${p.unidad} ${p.meta}`.toLowerCase().includes(q))
+    );
+    body = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Matriz de Proyectos Estratégicos PEI 2027–2030 (14 Proyectos Institucionales)</h2>
+          <p class="muted">Integrada íntegramente desde <code>modules/cartera_pei.py</code> en los 2 Focos institucionales (11 F1 · 3 F2) con las 6 columnas obligatorias. ${citeBadge('CARTERA-PEI-14')}</p>
+        </div>
+        <div class="toolbar no-print" style="margin:0">
+          <button class="btn btn-teal btn-sm" onclick="ANI.importOfficialPortfolio()">Incorporar los 14 a Cartera editable</button>
+          <button class="btn btn-soft btn-sm" onclick="ANI.importDbRecords()">Cargar registros Área GC (${DB_SEED_RECORDS.pei.length} PEI + ${DB_SEED_RECORDS.actionPlan.length} PA)</button>
+          <button class="btn btn-navy btn-sm" onclick="ANI.exportOfficialPeiCsv()">Descargar Matriz (CSV)</button>
+        </div>
+      </div>
+      <div class="toolbar no-print">
+        <select aria-label="Filtrar foco matriz institucional" onchange="ANI.setPeiFilter(this.value)">
+          <option value="" ${!filterFoco ? 'selected' : ''}>Todos los focos (14)</option>
+          <option value="F1" ${filterFoco === 'F1' ? 'selected' : ''}>F1 · Infraestructura dinamizadora (11)</option>
+          <option value="F2" ${filterFoco === 'F2' ? 'selected' : ''}>F2 · Ruta social y gestión preventiva (3)</option>
+        </select>
+        <input type="search" style="max-width:260px" placeholder="Buscar en matriz institucional…" value="${esc(searchProj)}" oninput="ANI.setPeiSearch(this.value)">
+        <span class="muted">Mostrando <b>${visibleOfficial.length}</b> de ${OFFICIAL_PEI_PORTFOLIO.length} proyectos</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Foco</th>
+              <th>Objetivo Estratégico</th>
+              <th>Proyecto</th>
+              <th>Unidad de medida</th>
+              <th>Meta 2030</th>
+              <th>Detalle</th>
+              <th class="no-print">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${visibleOfficial.map((p) => `<tr>
+              <td><b>${p.num}</b></td>
+              <td><span class="badge ${p.foco === 'F1' ? 'badge-teal' : 'badge-amber'}">${p.foco}</span><br><small class="muted">Grupo ${p.grupo}</small></td>
+              <td style="min-width:210px">${esc(p.objetivo)}</td>
+              <td style="min-width:190px"><b>${esc(p.proyecto)}</b></td>
+              <td style="min-width:130px">${esc(p.unidad)}</td>
+              <td style="min-width:110px"><b>${esc(p.meta)}</b></td>
+              <td style="min-width:280px">${esc(p.detalle)}</td>
+              <td class="no-print"><button class="btn btn-outline btn-xs" onclick="ANI.importOfficialPortfolio(${p.num})">+ Editar</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Clasificación Priorizada para la Cartera PEI 2027–2030 (3 Horizontes)</h2>
+          <p class="muted">Despliegue institucional en tres niveles de priorización integrados desde <code>modules/cartera_pei.py</code>. ${citeBadge('PRIORIZACION-3-GRUPOS')}</p>
+        </div>
+      </div>
+      <div class="grid-3">
+        ${OFFICIAL_PEI_PRIORITY_GROUPS.map((g) => `<div style="background:linear-gradient(145deg,#0B2C4A,#173F60);border-top:4px solid #F2A900;border-radius:10px;padding:16px;color:#fff;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;font-weight:800;color:#FFD166;letter-spacing:0.03em">${esc(g.titulo)}</div>
+          <div style="font-size:11.5px;color:#DCE8F1">${esc(g.proyectos)} · <b>${esc(g.periodo)}</b></div>
+          <div style="font-size:13.5px;font-weight:700">${esc(g.descripcion)}</div>
+          <p style="margin:4px 0 0;font-size:12px;color:#E6EEF6;line-height:1.5">${esc(g.justificacion)}</p>
+        </div>`).join('')}
       </div>
     </div>`;
   } else {
@@ -958,7 +1036,11 @@ export function renderMedia(state, mediaUi = {}) {
     const autoMatch = pool.filter((f) => !usedRepoUrls.has(f.url))[0];
     if (autoMatch && idx < pool.length) {
       usedRepoUrls.add(autoMatch.url);
-      return { url: autoMatch.url, sourceLabel: `Autodetectado en assets/media (${autoMatch.filename} · ${formatBytes(autoMatch.sizeBytes)})`, isBlob: false, cfg };
+      return { url: autoMatch.url, sourceLabel: `Autodetectado en repositorio (${autoMatch.filename} · ${formatBytes(autoMatch.sizeBytes)})`, isBlob: false, cfg };
+    }
+    if (slot.defaultUrl) {
+      usedRepoUrls.add(slot.defaultUrl);
+      return { url: slot.defaultUrl, sourceLabel: `Infografía oficial en ${slot.suggestedFile}`, isBlob: false, cfg };
     }
     return { url: '', sourceLabel: `Pendiente en ${slot.suggestedFile}`, isBlob: false, cfg };
   };

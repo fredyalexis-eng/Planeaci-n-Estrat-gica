@@ -29,20 +29,22 @@ export const STRATEGIC_IMAGE_SLOTS = [
   {
     slotId: 'img-lamina-focos',
     order: 1,
-    defaultTitle: 'Lámina Estratégica 01 — Iniciativas Estratégicas PND (Foco 1 y Foco 2)',
-    suggestedFile: 'assets/media/lamina_01_iniciativas_estrategicas.png',
+    defaultTitle: 'Bases Plan Nacional de Desarrollo 2026–2030 — 7 Ejes Estratégicos (Colombia, la patria milagro)',
+    defaultUrl: './assets/bases_pnd_siete_ejes.png',
+    suggestedFile: 'assets/bases_pnd_siete_ejes.png',
     defaultFoco: 'F1+F2',
-    citation: 'MARCO-S2.1',
-    summary: 'Insumo gráfico fuente referenciado en 01_Marco_Estrategico_ANI_2027-2030.md (§2.1): definición de los dos focos estratégicos, criterios transversales F1 y capacidades F2.'
+    citation: 'PND-7-EJES',
+    summary: 'Infografía institucional ANI sobre las Bases del PND 2026–2030 (DNP, noviembre 2026): Milagro de las regiones; Talento, conocimiento e innovación; Patriotismo constitucional; Milagro social; Milagro económico; Transformación del Estado; Reconstrucción, transformación y resiliencia.'
   },
   {
     slotId: 'img-lamina-tabla-pei',
     order: 2,
-    defaultTitle: 'Lámina Estratégica 02 — Matriz Contractual Tabla PEI 2027–2030',
-    suggestedFile: 'assets/media/lamina_02_tabla_pei_2027_2030.png',
+    defaultTitle: 'Matriz DOFA Estratégica Institucional — ANI',
+    defaultUrl: './assets/dofa_ani_estrategico.png',
+    suggestedFile: 'assets/dofa_ani_estrategico.png',
     defaultFoco: 'F1+F2',
-    citation: 'MARCO-S2.1',
-    summary: 'Insumo gráfico fuente referenciado en 01_Marco_Estrategico_ANI_2027-2030.md (§2.1): estructura de trazabilidad de 6 columnas (Foco, Objetivos, Proyecto, Unidad, Meta 2030, Detalle).'
+    citation: 'DOFA-ANI',
+    summary: 'Matriz DOFA institucional ANI incorporada al repositorio: 5 Fortalezas (experiencia técnica, ejecución, riesgos, marco legal, APP), 6 Debilidades, 5 Oportunidades (expansión multisectorial e intermodal, financiación, tecnología, articulación, cooperación) y 4 Amenazas.'
   }
 ];
 

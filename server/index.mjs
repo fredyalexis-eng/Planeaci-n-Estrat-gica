@@ -59,6 +59,7 @@ const ALLOWED_DIR_PREFIXES = ['assets/', 'data/'];
 
 function isPublicPathAllowed(relPosix) {
   if (!relPosix || relPosix.includes('..') || relPosix.startsWith('.')) return false;
+  if (/\.(db|sqlite|sqlite3|py|pyc)$/i.test(relPosix)) return false;
   const segments = relPosix.split('/');
   if (segments.some((s) => !s || s.startsWith('.'))) return false;
   if (ALLOWED_ROOT_FILES.has(relPosix)) return true;

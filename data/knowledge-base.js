@@ -679,5 +679,175 @@ export const STATIC_FALLBACK_CHUNKS = [
     authorityStatus: 'marco_repositorio',
     tags: ['PEI', 'Reglas', 'Checklist', 'Taller'],
     content: 'Reglas de llenado: Foco único (F1 o F2); Objetivo Estratégico vigente ANI (no inventar); Proyecto único y verificable con modo o frente; Unidad única; Meta 2030 solo si hay línea base, si no marcar "Por definir — línea base pendiente"; Detalle con criterios F1 o capacidades F2, supuestos y riesgos. Checklist de 7 puntos: foco único, objetivo vigente, unidad verificable, meta con línea base o por definir, criterios F1/capacidades F2 en detalle, scoring 1–5 completo y doble llave F1↔F2 declarada.'
+  },
+  {
+    id: 'IDENTIDAD-ANI',
+    docTitle: 'Identidad Institucional ANI (Módulo Agente Estratégico)',
+    section: 'Misión y Visión 2030 ANI',
+    sourceFile: 'modules/agente_estrategico.py',
+    lineRange: 'L37–L48',
+    authorityStatus: 'marco_repositorio',
+    tags: ['Misión', 'Visión', 'Identidad', 'F1', 'F2'],
+    content: 'Misión ANI: Impulsar y desarrollar proyectos integrales de infraestructura concesionada para transformar territorios, vidas y propósitos de manera sostenible, resiliente e incluyente fortaleciendo el tejido social, la equidad y la competitividad del país. Visión ANI: En el año 2030 la ANI será la entidad referente en la estructuración y gestión de proyectos de infraestructura para promover el desarrollo integral de los territorios y sus comunidades.'
+  },
+  {
+    id: 'PND-7-EJES',
+    docTitle: 'Bases Plan Nacional de Desarrollo 2026–2030 — Colombia, la patria milagro',
+    section: '7 Ejes Estratégicos (Bases en formulación, noviembre 2026)',
+    sourceFile: 'assets/bases_pnd_siete_ejes.png',
+    lineRange: 'Lámina DNP/ANI',
+    authorityStatus: 'en_construccion',
+    tags: ['PND', 'Ejes', 'F1', 'F2'],
+    content: 'Bases del Plan Nacional de Desarrollo 2026–2030 "Colombia, la patria milagro" (documento en formulación, noviembre 2026 — no ley expedida). 7 Ejes Estratégicos: (1) Milagro de las regiones; (2) Talento, conocimiento e innovación para el desarrollo; (3) Patriotismo constitucional; (4) Milagro social; (5) Milagro económico; (6) Transformación del Estado: un Estado que se acerca; (7) Reconstrucción, transformación y resiliencia.'
+  },
+  {
+    id: 'DOFA-ANI',
+    docTitle: 'Matriz DOFA Estratégica Institucional ANI',
+    section: 'Fortalezas, Debilidades, Oportunidades y Amenazas',
+    sourceFile: 'assets/dofa_ani_estrategico.png',
+    lineRange: 'Lámina ANI',
+    authorityStatus: 'marco_repositorio',
+    tags: ['DOFA', 'Oportunidades', 'Riesgos', 'Capacidades', 'F1', 'F2'],
+    content: 'Fortalezas: (1) Experiencia y Conocimiento Técnico en infraestructura y sector transporte; (2) Capacidad de Ejecución a gran escala; (3) Gestión de Riesgos contractuales y financieros; (4) Marco Legal y Regulatorio sólido; (5) Posicionamiento y experiencia con APPs. Debilidades: (1) Coordinación y Comunicación entre áreas; (2) Rezago tecnológico y sistemas de información; (3) Recursos Humanos (falta de planta y rotación de contratistas); (4) Cultura Organizacional; (5) Flexibilidad y Adaptabilidad; (6) Falta de articulación entre áreas. Oportunidades: (1) Expansión a otros sectores (salud, educación, agua, social) y modos distintos al carretero; (2) Nuevas fuentes de financiación; (3) Incorporación de tecnología y gestión de conocimiento; (4) Relacionamiento con Ministerios y entidades del gobierno; (5) Cooperación internacional. Amenazas: (1) Inestabilidad política y social; (2) Restricciones presupuestales; (3) Conflictos sociales y ambientales; (4) Riesgos jurídicos.'
+  },
+  {
+    id: 'CARTERA-PEI-14',
+    docTitle: 'Matriz de Proyectos Estratégicos PEI 2027–2030 (14 Proyectos)',
+    section: 'II. Matriz Institucional Foco 1 (11) y Foco 2 (3)',
+    sourceFile: 'modules/cartera_pei.py',
+    lineRange: 'L9–L135',
+    authorityStatus: 'en_construccion',
+    tags: ['PEI', 'Proyectos', 'F1', 'F2', 'PND'],
+    content: 'Foco 1 (11 proyectos): (1) Construcción Red Vial Primaria APP — 410,49 km (LB 3.596,9 km); (2) Mejoramiento y Rehabilitación Red Vial Primaria APP — 474,25 km (LB 4.639,4 km); (3) Reactivación y Desarrollo Ferroviario — 1.548,4 km; (4) Estructuración Portafolio Intermodal APP — 6 proyectos (LB 43); (5) Vías de la Patria Milagro — 8 Corredores Estratégicos; (6) Plan Intermodal del Chocó (Plan Marshall) — 100% formulado ($1 billón, 6 proyectos); (7) Estructuración APP Infraestructura Social y Productiva; (8) Navegabilidad Fluvial Canal del Dique (117 km) y Río Meta (99 km); (9) Modernización Concesiones Aeroportuarias y Portuarias; (10) Estrategia Obras que Avanzan y Destrabe de Proyectos Concesionados; (11) Transformación Digital, Gobierno de Datos y Monitoreo Inteligente ANI. Foco 2 (3 proyectos): (12) Estrategia de Ruta Social en Proyectos Concesionados — 100% nuevas estructuraciones; (13) Modelo Preventivo de Gestión de Conflictos y Alertas Tempranas Contractuales (contención riesgo litigioso 48 tribunales / $20 billones); (14) Estrategia de Sostenibilidad, Adaptación Climática e Inclusión Social ANI (cuotas equidad 25% operativo / 45% gerencial en 5G).'
+  },
+  {
+    id: 'PRIORIZACION-3-GRUPOS',
+    docTitle: 'Clasificación Priorizada Cartera PEI 2027–2030',
+    section: 'III. Tres Grupos de Priorización Institucional',
+    sourceFile: 'modules/cartera_pei.py',
+    lineRange: 'L138–L163',
+    authorityStatus: 'en_construccion',
+    tags: ['Priorización', 'PEI', 'Hoja de Ruta', 'F1', 'F2'],
+    content: 'Grupo 1 — Urgencia Estructural (2027–2028, Proyectos 1, 2, 4, 10, 13): recuperar seguridad jurídica, contener riesgo litigioso ($20 billones), destrabar obras y habilitar metas trazadoras PND. Grupo 2 — Transformación Intermodal (2027–2029, Proyectos 3, 5, 6, 8, 12): reactivación férrea (1.548,4 km), fluvial, 8 corredores nacionales, Plan Chocó ($1 billón) y Ruta Social. Grupo 3 — Innovación y Futuro (2028–2030, Proyectos 7, 9, 11, 14): APP social y productiva, modernización aeroportuaria/portuaria, gobierno de datos/IA y sostenibilidad e inclusión.'
   }
 ];
+
+/* ---------- INSUMOS INTEGRADOS DESDE MODULES/ Y ASSETS/ DEL REPOSITORIO ---------- */
+export const ANI_INSTITUTIONAL_IDENTITY = {
+  mision: 'Impulsar y desarrollar proyectos integrales de infraestructura concesionada para transformar territorios, vidas y propósitos de manera sostenible, resiliente e incluyente fortaleciendo el tejido social, la equidad y la competitividad del país.',
+  vision: 'En el año 2030 la ANI será la entidad referente en la estructuración y gestión de proyectos de infraestructura para promover el desarrollo integral de los territorios y sus comunidades.',
+  fuente: 'Insumo del repositorio: modules/agente_estrategico.py (sujeto a verificación contra acto administrativo oficial vigente de la ANI)',
+  notaPnd: 'Las Bases del Plan Nacional de Desarrollo 2026–2030 "Colombia, la patria milagro" fueron presentadas en noviembre de 2026 y se encuentran en formulación (no constituyen aún ley expedida).'
+};
+
+export const PND_7_AXES_OFFICIAL = [
+  { numero: 1, nombre: 'Milagro de las regiones', color: '#F2A900', focoSugerido: 'F1+F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 2, nombre: 'Talento, conocimiento e innovación para el desarrollo', color: '#1A73E8', focoSugerido: 'F1+F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 3, nombre: 'Patriotismo constitucional', color: '#E66A1F', focoSugerido: 'F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 4, nombre: 'Milagro social', color: '#189D47', focoSugerido: 'F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 5, nombre: 'Milagro económico', color: '#00A99D', focoSugerido: 'F1', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 6, nombre: 'Transformación del Estado: un Estado que se acerca', color: '#F2B705', focoSugerido: 'F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' },
+  { numero: 7, nombre: 'Reconstrucción, transformación y resiliencia', color: '#146EBE', focoSugerido: 'F1+F2', cita: 'Bases PND 2026–2030 "Colombia, la patria milagro" (noviembre 2026 — en formulación) · assets/bases_pnd_siete_ejes.png' }
+];
+
+export const DOFA_ANI_MATRIX = {
+  image: './assets/dofa_ani_estrategico.png',
+  citation: 'DOFA-ANI',
+  fortalezas: [
+    ['Experiencia y Conocimiento Técnico', 'Amplia experiencia en la gestión de proyectos de infraestructura, especialmente carreteras. Equipos técnicos y jurídicos robustos en el sector transporte.'],
+    ['Capacidad de Ejecución', 'Historial de ejecución exitosa de proyectos de infraestructura a gran escala.'],
+    ['Gestión de Riesgos', 'Experiencia en la identificación y gestión de riesgos contractuales y financieros.'],
+    ['Marco Legal y Regulatorio', 'Sólido marco legal y regulatorio para la estructuración y ejecución de proyectos de infraestructura.'],
+    ['Posicionamiento y experiencia con APPs', 'Mecanismo efectivo de financiación y estructuración de megaproyectos en el país.']
+  ],
+  debilidades: [
+    ['Coordinación y Comunicación', 'Desafíos en la coordinación y comunicación entre áreas. Falta de claridad en roles y responsabilidades.'],
+    ['Tecnología', 'Rezago tecnológico y falta de sistemas de información adecuados.'],
+    ['Recursos Humanos', 'Falta de personal de planta y alta rotación de contratistas. Dificultades para atraer y retener talento.'],
+    ['Cultura Organizacional', 'Necesidad de fortalecer la cultura organizacional y mejorar la comunicación interna.'],
+    ['Flexibilidad y Adaptabilidad', 'Rigidez en la estructura y operación de la agencia. Dificultad para adaptarse a los cambios y demandas del entorno.'],
+    ['Falta de articulación entre áreas', 'Lentitud en los procesos y toma de decisiones por ausencia de articulación.']
+  ],
+  oportunidades: [
+    ['Expansión a Otros Sectores y Modos', 'Oportunidad de expandir la gestión de proyectos a otros sectores (salud, educación, agua, social) y fortalecimiento de otros modos distintos al carretero.'],
+    ['Nuevas Fuentes de Financiación', 'Exploración de fuentes alternativas de financiación.'],
+    ['Incorporación de Tecnología', 'Incorporar tecnología y mejorar sistemas de información para mejorar eficiencia, productividad y capitalizar la gestión de conocimiento.'],
+    ['Relacionamiento con Ministerios y Entidades', 'Extrapolar capacidades y buscar sinergias en pro de mejorar la asignación de recursos presupuestales y ejecución de proyectos en curso.'],
+    ['Cooperación Internacional', 'Fortalecer la cooperación internacional para el desarrollo de proyectos de infraestructura.']
+  ],
+  amenazas: [
+    ['Inestabilidad Política y Social', 'El contexto político y social complejo puede afectar la ejecución de los proyectos.'],
+    ['Restricciones Presupuestales', 'Las restricciones presupuestales y la incertidumbre en la disponibilidad de recursos pueden afectar la viabilidad de los proyectos.'],
+    ['Conflictos Sociales y Ambientales', 'La oposición de las comunidades y los desafíos ambientales pueden retrasar o impedir la ejecución de los proyectos.'],
+    ['Riesgos Jurídicos', 'Los riesgos jurídicos asociados a los proyectos pueden afectar la capacidad de financiación.']
+  ]
+};
+
+export const OFFICIAL_PEI_PORTFOLIO = [
+  { num: 1, foco: 'F1', grupo: 1, objetivo: 'Incrementar la construcción de vías primarias concesionadas mediante esquemas de APP para mejorar la conectividad y capacidad vial del país.', proyecto: 'Construcción de Red Vial Primaria Concesionada (APP)', unidad: 'Kilómetros (km) construidos', lineaBase: '3.596,9 km (Indicadores PND, p. 1)', meta: '410,49 km', doble: '[F2] Modelo Preventivo de Gestión de Conflictos y Alertas Tempranas Contractuales', detalle: 'Obras de construcción de vía nueva y segundas calzadas en la red vial primaria concesionada (Línea base: 3.596,9 km; Meta cuatrienio PND: 410,49 km). Fuente: Indicadores PND, p. 1; ANI_Bases PND, p. 1, 6.' },
+  { num: 2, foco: 'F1', grupo: 1, objetivo: 'Mejorar y rehabilitar la calidad de la red vial primaria concesionada garantizando transitabilidad, seguridad y resiliencia climática.', proyecto: 'Mejoramiento y Rehabilitación de la Red Vial Primaria Concesionada (APP)', unidad: 'Kilómetros (km) mejorados / rehabilitados', lineaBase: '4.639,4 km (Indicadores PND, p. 1)', meta: '474,25 km', doble: '[F2] Estrategia de Ruta Social en Proyectos Concesionados', detalle: 'Intervenciones de mejoramiento, rehabilitación y conservación pesada en tramos concesionados bajo APP (Línea base: 4.639,4 km; Meta cuatrienio PND: 474,25 km). Fuente: Indicadores PND, p. 1; ANI_Bases PND, p. 6.' },
+  { num: 3, foco: 'F1', grupo: 2, objetivo: 'Reactivar, rehabilitar y operar la red ferroviaria nacional a cargo de la ANI para impulsar el transporte intermodal de carga y pasajeros.', proyecto: 'Programa Nacional de Reactivación y Desarrollo Ferroviario', unidad: 'Número de kilómetros de vía férrea intervenidos', lineaBase: 'N/A — Indicadores PND, p. 2 (meta trazadora PND)', meta: '1.548,4 km', doble: '[F2] Estrategia de Ruta Social en Proyectos Concesionados', detalle: 'Adjudicación, contratación y ejecución de obras de mejoramiento, rehabilitación y operación en corredores férreos (Villavicencio–Puerto Gaitán, Yumbo–Caimalito, Bogotá–Belencito, Férreo Central) (Línea base: N/A; Meta cuatrienio PND: 1.548,4 km / 1.543 km). Fuente: Indicadores PND, p. 2; PPTX Planeación, p. 10.' },
+  { num: 4, foco: 'F1', grupo: 1, objetivo: 'Estructurar de manera integral nuevos proyectos de infraestructura de transporte bajo el esquema de APP en fase de factibilidad.', proyecto: 'Estructuración Integral del Portafolio Intermodal de Transporte (APP)', unidad: 'Número de proyectos de infraestructura estructurados', lineaBase: '43 proyectos (Indicadores PND, p. 2)', meta: '6 proyectos', doble: '[F2] Estrategia de Ruta Social en Proyectos Concesionados (100% nuevas estructuraciones)', detalle: 'Proyectos de infraestructura para el desarrollo y conectividad estructurados en factibilidad bajo esquema APP en todos los modos (Línea base: 43 proyectos; Meta cuatrienio PND: 6 proyectos). Resuelve fallas históricas de maduración como el caso Canal del Dique (+$63.767M en EIA). Fuente: Indicadores PND, p. 2; Bases PND, p. 319, 321.' },
+  { num: 5, foco: 'F1', grupo: 2, objetivo: 'Consolidar la gestión unificada por corredores logísticos unificando red concesionada, no concesionada y accesos portuarios y de frontera.', proyecto: 'Programa «Vías de la Patria Milagro» / Gestión de Corredores Nacionales', unidad: 'Corredores Estratégicos bajo gestión unificada', lineaBase: 'Bases PND, p. 319, 321 (8 corredores priorizados)', meta: '8 Corredores Estratégicos', doble: '[F2] Estrategia de Ruta Social en Proyectos Concesionados', detalle: 'Gestión integral por corredores en 8 ejes: Pacífico-Orinoquía (Buenaventura), Chocó conectado (2), Conexión Venezuela (2), Conectando el Caribe, Mar de Antioquia y Conexión Ecuador. Fuente: Bases PND, p. 319, 321; ANI_Bases PND, p. 6-7.' },
+  { num: 6, foco: 'F1', grupo: 2, objetivo: 'Formular y estructurar la conectividad intermodal y resiliente para la reconstrucción del departamento del Chocó tras la emergencia sísmica.', proyecto: 'Plan Intermodal del Chocó («Plan Marshall»)', unidad: 'Plan Intermodal formulado / % de estructuración', lineaBase: 'Plan Marshall, p. 1-2; Bases PND, p. 442-443', meta: '100% formulado y estructurado', doble: '[F2] Estrategia de Ruta Social en Proyectos Concesionados', detalle: 'Cartera de conectividad por $1 billón cofinanciada (Obras por Impuestos y capital privado) para 6 proyectos (Quibdó–Ánimas–Nóvita, San José del Palmar–El Cairo, Istmina–Puerto Meluk, Vía al Darién, Tutunendo–Ichó, Aeropuerto Bahía Solano y evaluación del canal interoceánico Cupica). Fuente: Plan Marshall, p. 1-2; Bases PND, p. 442-443.' },
+  { num: 7, foco: 'F1', grupo: 3, objetivo: 'Brindar asistencia técnica y estructurar iniciativas de APP en infraestructura social (salud, educación) y productiva (energía, TIC).', proyecto: 'Estructuración de APP en Infraestructura Social y Productiva', unidad: 'Proyectos de APP social y productiva estructurados', lineaBase: 'Bases PND, p. 280, 321 (requiere delimitación R2)', meta: 'Portafolio Social y Productivo en APP', doble: '[F2] Estrategia de Sostenibilidad, Adaptación Climática e Inclusión Social ANI', detalle: 'Apoyo técnico a ministerios para movilizar capital privado en salud (ej. Hospital Simón Bolívar), educación, infraestructura penitenciaria, energía y TIC sin presionar la caja fiscal. Fuente: Bases PND, p. 280, 321; ANI_Bases PND, p. 1, 6.' },
+  { num: 8, foco: 'F1', grupo: 2, objetivo: 'Garantizar la navegación y la protección ambiental en hidrovías estratégicas de la Nación.', proyecto: 'Programa de Navegabilidad y Concesiones Fluviales (Canal del Dique y Río Meta)', unidad: '% de avance de obra / Proyectos fluviales en factibilidad', lineaBase: 'Canal del Dique (117 km) y Río Meta (99 km) — Libro de la Verdad, p. 116-117', meta: '100% de ejecución en Canal del Dique y factibilidad Río Meta', doble: '[F2] Estrategia de Ruta Social y Sostenibilidad Ambiental ANI', detalle: 'Gestión del contrato de concesión ambiental y navegación en el Canal del Dique (117 km) tras la radicación del nuevo EIA, y culminación de la estructuración a factibilidad del Río Meta (99 km). Fuente: Libro de la Verdad, p. 116-117; Bases PND, p. 319.' },
+  { num: 9, foco: 'F1', grupo: 3, objetivo: 'Optimizar y expandir la capacidad operativa de terminales aéreos y marítimos bajo concesión.', proyecto: 'Programa de Modernización de Concesiones Aeroportuarias y Portuarias', unidad: 'Contratos de concesión con obras de expansión ejecutadas', lineaBase: 'Concesiones nodo aéreo y marítimo vigentes (Bases PND, p. 319, 359)', meta: '100% de concesiones nodo aéreo y marítimo modernizadas', doble: '[F2] Estrategia de Sostenibilidad, Adaptación Climática e Inclusión Social ANI', detalle: 'Seguimiento y ejecución de obras de ampliación en aeropuertos principales (Bogotá, Medellín, Cali, Barranquilla, Cartagena) y supervisión del recaudo de contraprestaciones portuarias/aeroportuarias. Fuente: Bases PND, p. 319, 359; ANI_Bases PND, p. 1.' },
+  { num: 10, foco: 'F1', grupo: 1, objetivo: 'Destrabar proyectos con cuellos de botella y reactivar el capital inmovilizado en el sector.', proyecto: 'Estrategia «Obras que Avanzan» y Destrabe de Proyectos Concesionados', unidad: 'Número de proyectos concesionados destrabados', lineaBase: 'Inventario de restricciones ($7,6 billones inmovilizados — Libro de la Verdad, p. 113)', meta: '100% de megaproyectos concesionados paralizados destrabados', doble: '[F2] Modelo Preventivo de Gestión de Conflictos y Alertas Tempranas Contractuales', detalle: 'Levantamiento del inventario de restricciones técnicas, prediales, ambientales y financieras en proyectos concesionados con retrasos (recuperando los más de $7,6 billones inmovilizados en el sector). Fuente: Bases PND, p. 320, 401; Libro de la Verdad, p. 113.' },
+  { num: 11, foco: 'F1', grupo: 3, objetivo: 'Modernizar la supervisión y el control mediante herramientas de analítica e inteligencia artificial.', proyecto: 'Transformación Digital, Gobierno de Datos y Monitoreo Inteligente ANI', unidad: '% de implementación del sistema digital de monitoreo contractual', lineaBase: 'Diagnóstico Gobierno de Datos / SUIT (Bases PND, p. 344, 401; Libro de la Verdad, p. 109)', meta: '100% de la gestión contractual bajo monitoreo inteligente', doble: '[F2] Modelo Preventivo de Gestión de Conflictos y Alertas Tempranas Contractuales', detalle: 'Despliegue de la Estrategia de Gobierno de Datos y uso de IA para la verificación de tráfico, recaudo de peajes, seguimiento de obras físicas y automatización de trámites (SUIT). Fuente: Bases PND, p. 344, 401; Libro de la Verdad, p. 109.' },
+  { num: 12, foco: 'F2', grupo: 2, objetivo: 'Institucionalizar el diálogo temprano con comunidades para construir acuerdos voluntarios y generar valor local.', proyecto: 'Estrategia de Ruta Social en Proyectos Concesionados', unidad: '% de nuevas estructuraciones con Ruta Social / Acuerdos formalizados', lineaBase: 'Bases PND, p. 320, 322; ANI_Bases PND, p. 2, 7-8', meta: '100% de nuevas estructuraciones con Ruta Social', doble: '[F1] Portafolio Intermodal APP, Vías de la Patria Milagro, Ferroviario y Plan Chocó', detalle: 'Concertación de acuerdos voluntarios entre concesionarios, comunidades y alcaldías para financiar vías secundarias/terciarias e iniciativas productivas locales sin alterar la estabilidad económica de los contratos. Fuente: Bases PND, p. 320, 322; ANI_Bases PND, p. 2, 7-8.' },
+  { num: 13, foco: 'F2', grupo: 1, objetivo: 'Implementar un modelo preventivo con alertas tempranas para reducir la litigiosidad y evitar parálisis de obras.', proyecto: 'Modelo Preventivo de Gestión de Conflictos y Alertas Tempranas Contractuales', unidad: 'Sistema de alertas tempranas operativo / Controversias resueltas', lineaBase: '48 tribunales arbitrales por $20 billones (Libro de la Verdad, p. 121-122)', meta: '100% de proyectos bajo gestión preventiva (reducción del riesgo litigioso)', doble: '[F1] Estrategia Obras que Avanzan y Red Vial Primaria Concesionada APP', detalle: 'Fortalecimiento de las capacidades prediales, sociales, ambientales, jurídicas y tecnológicas de la ANI para resolver disputas contractuales oportunamente, conteniendo el riesgo litigioso que alcanzó 48 tribunales arbitrales por $20 billones. Fuente: Libro de la Verdad, p. 121-122; ANI_Bases PND, p. 7-8.' },
+  { num: 14, foco: 'F2', grupo: 3, objetivo: 'Incorporar resiliencia climática, sostenibilidad e inclusión de género en todo el ciclo contractual.', proyecto: 'Estrategia de Sostenibilidad, Adaptación Climática e Inclusión Social ANI', unidad: 'Porcentaje de proyectos concesionados con criterios de sostenibilidad e inclusión', lineaBase: 'Estándares 5G: 25% operativo / 45% gerencial (Bases PND, p. 319, 322)', meta: '100% de contratos concesionados bajo estándares de sostenibilidad y equidad', doble: '[F1] Concesiones Viales, Férreas, Fluviales, Portuarias, Aeroportuarias y APP Social', detalle: 'Incorporación de guías de Infraestructura Verde, adaptación a cambio climático y cuotas de equidad de género (25% operativo / 45% gerencial en 5G) en estructuración y ejecución. Fuente: Bases PND, p. 319, 322; PPTX Planeación, p. 8, 10.' }
+];
+
+export const OFFICIAL_PEI_PRIORITY_GROUPS = [
+  {
+    id: 1,
+    titulo: 'GRUPO 1: URGENCIA ESTRUCTURAL',
+    proyectos: 'Proyectos 1, 2, 4, 10, 13',
+    descripcion: 'Recuperar seguridad jurídica, destrabar obras y metas PND.',
+    justificacion: 'Constituyen el núcleo de la estabilidad jurídica e institucional. Detener la expansión del riesgo litigioso de $20 billones (Proyecto 13) y destrabar megaproyectos inconclusos (Proyecto 10) es indispensable para habilitar el cumplimiento de los indicadores trazadores del PND de 410,49 km construidos, 474,25 km mejorados y las 6 nuevas estructuraciones APP (Proyectos 1, 2 y 4).',
+    periodo: 'Años 2027–2028'
+  },
+  {
+    id: 2,
+    titulo: 'GRUPO 2: TRANSFORMACIÓN INTERMODAL',
+    proyectos: 'Proyectos 3, 5, 6, 8, 12',
+    descripcion: 'Reactivación férrea, fluvial, Plan Chocó y Ruta Social.',
+    justificacion: 'Materializan el giro estratégico hacia la intermodalidad y el desarrollo regional. Permiten diversificar la matriz logística con 1.548,4 km férreos (Proyecto 3), cumplir los compromisos del «Plan Marshall» en el Pacífico por $1 billón (Proyecto 6) e institucionalizar la legitimidad comunitaria en el territorio (Proyecto 12).',
+    periodo: 'Años 2027–2029'
+  },
+  {
+    id: 3,
+    titulo: 'GRUPO 3: INNOVACIÓN Y FUTURO',
+    proyectos: 'Proyectos 7, 9, 11, 14',
+    descripcion: 'APP social, modernización aeroportuaria e IA.',
+    justificacion: 'Consolidan el posicionamiento de la ANI a 2030 como entidad referente regional. Permiten extender las APP hacia salud y educación (Proyecto 7), modernizar la supervisión con inteligencia artificial (Proyecto 11) y garantizar altos estándares de resiliencia e inclusión (Proyecto 14).',
+    periodo: 'Años 2028–2030'
+  }
+];
+
+export const DB_SEED_RECORDS = {
+  sourceFile: 'data/strategy_lab.db',
+  areas: [{ id: 1, nombre: 'GIT de Planeación - GC', activa: true, fecha: '2026-11-14' }],
+  pei: [
+    {
+      dbId: 1,
+      area: 'GIT de Planeación - GC',
+      foco: 'F2',
+      objetivo: 'Implementar una estrategia integral de gestión del conocimiento, innovación y memoria institucional que permita preservar el conocimiento crítico de la ANI, facilitar su acceso y reutilización, fortalecer la toma de decisiones basada en evidencia y reducir el riesgo de pérdida de conocimiento institucional',
+      proyecto: 'Analítica institucional',
+      unidad: 'productos implementados',
+      lineaBase: 'Registro base data/strategy_lab.db (GIT de Planeación - GC)',
+      meta: 'Implementar 12 ejercicios de analítica instiucional',
+      detalle: 'Propuesta registrada por GIT de Planeación - GC en data/strategy_lab.db (Estado: Aprobado, 2026-11-14). Capacidad tecnológica y de gestión del conocimiento.',
+      responsable: 'GIT de Planeación - GC',
+      estatus: 'oficial'
+    }
+  ],
+  actionPlan: [
+    { dbId: 1, peiDbId: 1, codigo: 'PA-DB-01', foco: 'F2', actividad: 'Hacer 2 ejercicios de analítica institucional', m2027: '2', unidad: 'ejercicios realizados', detalle: 'Registro importado de data/strategy_lab.db (detalle pendiente de completar por el área)', responsable: 'GIT de Planeación - GC', lineaBase: 'Registro data/strategy_lab.db', estado: 'En construcción' },
+    { dbId: 2, peiDbId: 1, codigo: 'PA-DB-02', foco: 'F2', actividad: 'Hacer 2 ejercicios de analítica institucional', m2027: '2', unidad: 'ejercicios realizados', detalle: 'aprobadas y validadas y en uso', responsable: 'GIT de Planeación - GC', lineaBase: 'Registro data/strategy_lab.db', estado: 'En construcción' },
+    { dbId: 3, peiDbId: 1, codigo: 'PA-DB-03', foco: 'F2', actividad: 'hacer ejercicios de analítica', m2027: '2', unidad: 'ejercicios realizados', detalle: 'Prueba de edición y persistencia DATA', responsable: 'GIT de Planeación - GC', lineaBase: 'Registro data/strategy_lab.db', estado: 'En construcción' }
+  ]
+};

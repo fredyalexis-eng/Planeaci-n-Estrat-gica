@@ -375,7 +375,12 @@ test('7. Centro Audiovisual: /api/media, autodetección de 2 videos e imágenes,
     const inv = await (await fetch(`${srv.baseUrl}/api/media`)).json();
     assert.equal(inv.ok, true);
     assert.equal(inv.videos.length, 2);
-    assert.equal(inv.images.length, 1);
+    assert.ok(inv.images.length >= 3, 'Debe detectar bases_pnd_siete_ejes.png, dofa_ani_estrategico.png y la lámina de prueba');
+    assert.ok(inv.images.some((i) => i.filename === 'bases_pnd_siete_ejes.png'));
+    assert.ok(inv.images.some((i) => i.filename === 'dofa_ani_estrategico.png'));
+    // Bloqueo estricto de SQLite y scripts Python
+    assert.equal((await fetch(`${srv.baseUrl}/data/strategy_lab.db`)).status, 404);
+    assert.equal((await fetch(`${srv.baseUrl}/modules/database.py`)).status, 404);
 
     // Verificar streaming HTTP 206 Partial Content para reproducción/adelanto HTML5
     const rangeRes = await fetch(`${srv.baseUrl}/assets/media/__test_video_01.mp4`, {
@@ -398,7 +403,9 @@ test('7. Centro Audiovisual: /api/media, autodetección de 2 videos e imágenes,
     const st = migrateState({});
     const html = renderMedia(st, { mediaTab: 'todo', repoMedia: inv, sessionBlobs: {} });
     assert.equal([...html.matchAll(/<video\b/g)].length, 2, 'Deben renderizarse los 2 reproductores HTML5 <video>');
-    assert.equal([...html.matchAll(/class="media-img-preview"/g)].length, 1, 'Debe renderizarse la imagen estratégica con visor lightbox');
+    assert.ok([...html.matchAll(/class="media-img-preview"/g)].length >= 3, 'Deben renderizarse las infografías institucionales + imagen de prueba con visor lightbox');
+    assert.ok(html.includes('bases_pnd_siete_ejes.png'));
+    assert.ok(html.includes('dofa_ani_estrategico.png'));
     assert.ok(html.includes('03_Canvas_2_Focos_ANI.html'), 'Debe preservar el Canvas Ejecutivo 2 Focos');
     assert.ok(html.includes('2/2 videos activos'));
   } finally {

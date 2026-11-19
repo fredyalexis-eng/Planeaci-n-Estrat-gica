@@ -14,7 +14,10 @@ import {
   RECOMMENDATIONS,
   STRATEGIC_RISKS,
   BASE_DOC_SHEETS,
-  REPO_DOCUMENTS
+  REPO_DOCUMENTS,
+  ANI_INSTITUTIONAL_IDENTITY,
+  PND_7_AXES_OFFICIAL,
+  DOFA_ANI_MATRIX
 } from '../../data/knowledge-base.js';
 import {
   esc,
@@ -397,6 +400,16 @@ export function renderIdentity(state) {
   }).join('');
 
   return `
+  <div class="callout callout-teal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <b>Misión y Visión ANI disponibles en el repositorio</b> ${citeBadge('IDENTIDAD-ANI')}<br>
+        <span style="font-size:12.4px"><b>Misión:</b> ${esc(ANI_INSTITUTIONAL_IDENTITY.mision)}</span><br>
+        <span style="font-size:12.4px"><b>Visión 2030:</b> ${esc(ANI_INSTITUTIONAL_IDENTITY.vision)}</span>
+      </div>
+      <button class="btn btn-teal btn-sm no-print" onclick="ANI.loadRepoIdentity()">Cargar en fichas editables</button>
+    </div>
+  </div>
   <div class="callout callout-warn">
     <b>Salvaguarda de rigor institucional</b> ${citeBadge('MARCO-S2.3')}: El repositorio base registra expresamente la
     <b>Misión, Visión y Objetivos Estratégicos vigentes de la ANI</b> como <i>“Información insuficiente para concluir”</i>.
@@ -719,11 +732,29 @@ export function renderPndDocs(state, subtab = 'ejes', activeDoc = 'pnd') {
   let body = '';
   if (subtab === 'ejes') {
     body = `
-    <div class="callout callout-navy">
-      <b>Iniciativas del PND ya verificadas en el repositorio</b> ${citeBadge('MARCO-S1')}:
-      <b>(1)</b> Infraestructura dinamizadora para la conectividad y el desarrollo (F1) y
-      <b>(2)</b> Ruta social y gestión preventiva de conflictos (F2).
-      El texto completo de los <b>7 ejes del PND</b> aún no está cargado en el repositorio: diligencie cada eje con su denominación oficial y referencia exacta (sin inventar nombres).
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Bases Plan Nacional de Desarrollo 2026–2030 — Colombia, la patria milagro (7 Ejes Estratégicos)</h2>
+          <p class="muted">${esc(ANI_INSTITUTIONAL_IDENTITY.notaPnd)} ${citeBadge('PND-7-EJES')} ${citeBadge('MARCO-S1')}</p>
+        </div>
+        <div class="toolbar no-print" style="margin:0">
+          <button class="btn btn-teal btn-sm" onclick="ANI.loadOfficialPndAxes()">Precargar 7 Ejes en fichas</button>
+          <button class="btn btn-outline btn-sm" onclick="ANI.openImageLightbox('./assets/bases_pnd_siete_ejes.png','Bases PND 2026–2030 · 7 Ejes Estratégicos')">⤢ Ampliar lámina</button>
+        </div>
+      </div>
+      <div class="grid-2" style="align-items:center">
+        <div>
+          <img src="./assets/bases_pnd_siete_ejes.png" alt="Bases Plan Nacional de Desarrollo 2026-2030 — 7 Ejes Estratégicos" style="width:100%;border-radius:10px;border:1px solid var(--line);cursor:zoom-in" onclick="ANI.openImageLightbox('./assets/bases_pnd_siete_ejes.png','Bases PND 2026–2030 · 7 Ejes Estratégicos')" loading="lazy">
+        </div>
+        <div>
+          ${PND_7_AXES_OFFICIAL.map((ax) => `<div style="display:flex;align-items:center;gap:10px;padding:7px 11px;margin-bottom:6px;background:#F6F9FC;border-radius:8px;border-left:4px solid ${ax.color}">
+            <span class="badge badge-navy">${ax.numero}</span>
+            <b style="flex:1;font-size:12.8px;color:var(--navy-900)">${esc(ax.nombre)}</b>
+            <span class="badge ${ax.focoSugerido === 'F1' ? 'badge-f1' : ax.focoSugerido === 'F2' ? 'badge-f2' : 'badge-navy'}">${esc(ax.focoSugerido)}</span>
+          </div>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="grid-2">
       ${state.pndAxes.map((ax, idx) => {
@@ -1094,14 +1125,48 @@ export function renderOpportunities(state, filterFoco = '', oppTab = 'todo') {
         </div>`}
   </div>`;
 
+  const dofaHtml = `
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2>Matriz DOFA Estratégica Institucional — ANI</h2>
+        <p class="muted">Diagnóstico estratégico integrado desde <code>assets/dofa_ani_estrategico.png</code>. ${citeBadge('DOFA-ANI')}</p>
+      </div>
+      <div class="toolbar no-print" style="margin:0">
+        <button class="btn btn-outline btn-sm" onclick="ANI.openImageLightbox('./assets/dofa_ani_estrategico.png','Matriz DOFA Estratégica ANI')">⤢ Ver lámina original</button>
+        <a class="btn btn-soft btn-sm" href="./assets/dofa_ani_estrategico.png" download="dofa_ani_estrategico.png">⬇ Descargar PNG</a>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="entity-card" style="margin:0;border-top:4px solid #0B5FA5">
+        <h3 style="margin:0 0 8px;color:#0B5FA5">Fortalezas (${DOFA_ANI_MATRIX.fortalezas.length})</h3>
+        <ol class="clean-list" style="padding-left:18px;margin:0">${DOFA_ANI_MATRIX.fortalezas.map(([t, d]) => `<li style="margin-bottom:5px;font-size:12.4px"><b>${esc(t)}:</b> ${esc(d)}</li>`).join('')}</ol>
+      </div>
+      <div class="entity-card" style="margin:0;border-top:4px solid #D97706">
+        <h3 style="margin:0 0 8px;color:#B45309">Debilidades (${DOFA_ANI_MATRIX.debilidades.length})</h3>
+        <ol class="clean-list" style="padding-left:18px;margin:0">${DOFA_ANI_MATRIX.debilidades.map(([t, d]) => `<li style="margin-bottom:5px;font-size:12.4px"><b>${esc(t)}:</b> ${esc(d)}</li>`).join('')}</ol>
+      </div>
+      <div class="entity-card" style="margin:0;border-top:4px solid #15803D">
+        <h3 style="margin:0 0 8px;color:#15803D">Oportunidades (${DOFA_ANI_MATRIX.oportunidades.length})</h3>
+        <ol class="clean-list" style="padding-left:18px;margin:0">${DOFA_ANI_MATRIX.oportunidades.map(([t, d]) => `<li style="margin-bottom:5px;font-size:12.4px"><b>${esc(t)}:</b> ${esc(d)}</li>`).join('')}</ol>
+      </div>
+      <div class="entity-card" style="margin:0;border-top:4px solid #B91C1C">
+        <h3 style="margin:0 0 8px;color:#B91C1C">Amenazas (${DOFA_ANI_MATRIX.amenazas.length})</h3>
+        <ol class="clean-list" style="padding-left:18px;margin:0">${DOFA_ANI_MATRIX.amenazas.map(([t, d]) => `<li style="margin-bottom:5px;font-size:12.4px"><b>${esc(t)}:</b> ${esc(d)}</li>`).join('')}</ol>
+      </div>
+    </div>
+    <img src="./assets/dofa_ani_estrategico.png" alt="Matriz DOFA Estratégica Institucional ANI" style="width:100%;border-radius:10px;border:1px solid var(--line);cursor:zoom-in" onclick="ANI.openImageLightbox('./assets/dofa_ani_estrategico.png','Matriz DOFA Estratégica ANI')" loading="lazy">
+  </div>`;
+
   let content = '';
   if (oppTab === 'tabla') content = tableHtml;
+  else if (oppTab === 'dofa') content = dofaHtml;
   else if (oppTab === 'recomendaciones') content = recsHtml;
-  else content = fichasHtml + recsHtml;
+  else content = fichasHtml + dofaHtml + recsHtml;
 
   return `
   <div class="subtabs no-print">
-    ${tabs.map(([id, label]) => `<button class="subtab ${oppTab === id ? 'active' : ''}" onclick="ANI.setOppTab('${id}')">${esc(label)}</button>`).join('')}
+    ${[...tabs, ['dofa', 'Matriz DOFA ANI']].map(([id, label]) => `<button class="subtab ${oppTab === id ? 'active' : ''}" onclick="ANI.setOppTab('${id}')">${esc(label)}</button>`).join('')}
   </div>
   ${content}`;
 }

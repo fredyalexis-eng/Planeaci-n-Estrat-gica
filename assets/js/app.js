@@ -9,7 +9,11 @@
 import {
   STORAGE_KEY,
   ILLUSTRATIVE_CSV_EXAMPLES,
-  AGENT_QUICK_PROMPTS
+  AGENT_QUICK_PROMPTS,
+  ANI_INSTITUTIONAL_IDENTITY,
+  PND_7_AXES_OFFICIAL,
+  OFFICIAL_PEI_PORTFOLIO,
+  DB_SEED_RECORDS
 } from '../../data/knowledge-base.js';
 import {
   esc,
@@ -710,6 +714,112 @@ export function createAniApp() {
       save(true);
       toast('2 ejemplos ilustrativos de formato cargados (no son datos oficiales)');
     },
+    loadRepoIdentity() {
+      state.identity.mision = ANI_INSTITUTIONAL_IDENTITY.mision;
+      state.identity.misionFuente = ANI_INSTITUTIONAL_IDENTITY.fuente;
+      state.identity.misionEstatus = 'en_construccion';
+      state.identity.vision = ANI_INSTITUTIONAL_IDENTITY.vision;
+      state.identity.visionFuente = ANI_INSTITUTIONAL_IDENTITY.fuente;
+      state.identity.visionEstatus = 'en_construccion';
+      save(true);
+      toast('Misión y Visión ANI cargadas desde el repositorio');
+    },
+    loadOfficialPndAxes() {
+      PND_7_AXES_OFFICIAL.forEach((off, idx) => {
+        if (!state.pndAxes[idx]) return;
+        state.pndAxes[idx].nombre = off.nombre;
+        if (!state.pndAxes[idx].foco) state.pndAxes[idx].foco = off.focoSugerido;
+        if (!state.pndAxes[idx].cita) state.pndAxes[idx].cita = off.cita;
+        state.pndAxes[idx].estatus = 'en_construccion';
+      });
+      save(true);
+      toast('7 Ejes de las Bases PND 2026–2030 precargados en las fichas');
+    },
+    importOfficialPortfolio(singleNum = null) {
+      const source = singleNum
+        ? OFFICIAL_PEI_PORTFOLIO.filter((p) => p.num === Number(singleNum))
+        : OFFICIAL_PEI_PORTFOLIO;
+      const existingNames = new Set(state.projects.map((p) => (p.proyecto || '').trim().toLowerCase()));
+      let added = 0;
+      source.forEach((p) => {
+        if (existingNames.has(p.proyecto.trim().toLowerCase())) return;
+        state.projects.push(createProject({
+          foco: p.foco,
+          objetivo: p.objetivo,
+          proyecto: p.proyecto,
+          unidad: p.unidad,
+          lineaBase: p.lineaBase,
+          meta: p.meta,
+          detalle: p.detalle,
+          doble: p.doble,
+          estatus: 'en_construccion',
+          scores: p.grupo === 1
+            ? { impInst: 5, impNac: 5, alineacion: 5, factTec: 4, factFin: 4, factJur: 4, factPol: 4, riesgo: 3, tiempo: 2 }
+            : p.grupo === 2
+              ? { impInst: 5, impNac: 5, alineacion: 5, factTec: 4, factFin: 3, factJur: 4, factPol: 4, riesgo: 3, tiempo: 3 }
+              : { impInst: 4, impNac: 4, alineacion: 5, factTec: 4, factFin: 4, factJur: 4, factPol: 4, riesgo: 2, tiempo: 4 }
+        }));
+        added++;
+      });
+      if (singleNum) ui.peiTab = 'fichas';
+      save(true);
+      toast(added ? `${added} proyecto(s) incorporados a la Cartera PEI editable` : 'Los proyectos ya están en la Cartera PEI editable');
+    },
+    importDbRecords() {
+      let addedPei = 0;
+      let addedPa = 0;
+      const peiIdMap = new Map();
+      DB_SEED_RECORDS.pei.forEach((rec) => {
+        let found = state.projects.find((p) => (p.proyecto || '').trim().toLowerCase() === rec.proyecto.trim().toLowerCase());
+        if (!found) {
+          found = createProject({
+            foco: rec.foco,
+            objetivo: rec.objetivo,
+            proyecto: rec.proyecto,
+            unidad: rec.unidad,
+            lineaBase: rec.lineaBase,
+            meta: rec.meta,
+            detalle: rec.detalle,
+            responsable: rec.responsable,
+            estatus: rec.estatus
+          });
+          state.projects.unshift(found);
+          addedPei++;
+        }
+        peiIdMap.set(rec.dbId, found);
+      });
+      DB_SEED_RECORDS.actionPlan.forEach((a) => {
+        if (state.actionPlan.some((x) => x.codigo === a.codigo)) return;
+        const parent = peiIdMap.get(a.peiDbId);
+        state.actionPlan.push(createActionItem({
+          codigo: a.codigo,
+          foco: parent?.foco || a.foco,
+          objetivo: parent?.objetivo || '',
+          proyectoId: parent?.id || '',
+          proyectoNombre: parent?.proyecto || '',
+          actividad: a.actividad,
+          m2027: a.m2027,
+          unidad: a.unidad,
+          detalle: a.detalle,
+          responsable: a.responsable,
+          lineaBase: a.lineaBase,
+          estado: a.estado,
+          estatus: 'en_construccion'
+        }));
+        addedPa++;
+      });
+      save(true);
+      toast(addedPei || addedPa
+        ? `Base Área GC cargada: ${addedPei} PEI y ${addedPa} actividad(es) Plan de Acción`
+        : 'Los registros de GIT de Planeación - GC ya están cargados');
+    },
+    exportOfficialPeiCsv() {
+      api.closeDropdowns();
+      const escCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = ['FOCO', 'OBJETIVO ESTRATÉGICO', 'PROYECTO', 'UNIDAD DE MEDIDA', 'META 2030', 'DETALLE', 'GRUPO PRIORIZACIÓN'].map(escCsv).join(',');
+      const rows = OFFICIAL_PEI_PORTFOLIO.map((p) => [p.foco, p.objetivo, p.proyecto, p.unidad, p.meta, p.detalle, `Grupo ${p.grupo}`].map(escCsv).join(','));
+      downloadFile('ANI_Matriz_Cartera_PEI_2027-2030_14_Proyectos.csv', `\uFEFF${[header, ...rows].join('\n')}`, 'text/csv;charset=utf-8');
+    },
     dupProject(id) {
       const orig = state.projects.find((x) => x.id === id);
       if (!orig) return;
@@ -989,6 +1099,20 @@ export function createAniApp() {
           <img src="${esc(src)}" alt="${esc(title)}" class="lightbox-img">
         </div>
         ${caption ? `<p class="muted" style="margin-top:10px">${esc(caption)}</p>` : ''}`
+      );
+    },
+    openImageLightbox(rawSrc, title = 'Lámina estratégica ANI') {
+      const src = sanitizeMediaUrl(rawSrc || '');
+      if (!src) return;
+      openModal(
+        title,
+        `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="badge badge-navy">Infografía Institucional ANI</span>
+          <a class="btn btn-outline btn-xs" href="${esc(src)}" target="_blank" rel="noopener">Abrir en pestaña nueva ↗</a>
+        </div>
+        <div class="lightbox-stage">
+          <img src="${esc(src)}" alt="${esc(title)}" class="lightbox-img">
+        </div>`
       );
     },
     handleMediaError(el) {

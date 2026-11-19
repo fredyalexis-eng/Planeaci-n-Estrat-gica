@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { STATIC_FALLBACK_CHUNKS } from '../data/knowledge-base.js';
 
 const SPANISH_STOPWORDS = new Set([
   'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las', 'por', 'un', 'para',
@@ -327,6 +328,15 @@ export class KnowledgeEngine {
         }
       } catch {
         // Carpeta opcional
+      }
+    }
+
+    // Incorporar fragmentos institucionales integrados (Identidad, 7 Ejes PND, DOFA, Matriz PEI 14 y 3 Grupos)
+    const existingIds = new Set(chunks.map((c) => c.id));
+    for (const sc of STATIC_FALLBACK_CHUNKS) {
+      if (!existingIds.has(sc.id)) {
+        chunks.push({ ...sc });
+        existingIds.add(sc.id);
       }
     }
 
