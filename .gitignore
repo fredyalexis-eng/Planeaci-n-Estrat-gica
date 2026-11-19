@@ -1,0 +1,24 @@
+# Credenciales y variables de entorno (NUNCA versionar)
+.env
+.env.*
+!.env.example
+
+# Dependencias y artefactos temporales
+node_modules/
+_site/
+dist/
+build/
+coverage/
+*.log
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python / artefactos auxiliares locales
+__pycache__/
+*.py[cod]
+*.respaldo*
+*_respaldo_*.py

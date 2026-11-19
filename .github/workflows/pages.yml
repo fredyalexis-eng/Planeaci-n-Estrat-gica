@@ -1,10 +1,16 @@
-# Deploy GitHub Pages — App Interactiva ANI PEI 2027-2030
-# Publica el index.html de la raíz en https://fredyalexis-eng.github.io/Planeaci-n-Estrat-gica/
+# Deploy GitHub Pages — ANI STRATEGY LAB (PEI 2027-2030)
+# Publica exclusivamente el frontend estático y los documentos/activos públicos en:
+# https://fredyalexis-eng.github.io/Planeaci-n-Estrat-gica/
+# Excluye explícitamente server/, modules/, bases .db, package.json y .env*.
 name: Deploy GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
   workflow_dispatch:
 
 permissions:
@@ -13,26 +19,63 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  verify:
+    name: Verify Suite & Static Pages Bundle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Upload artifact
+      - name: Run integration & regression tests
+        run: npm test
+
+      - name: Stage public static frontend (_site)
+        run: |
+          rm -rf _site
+          mkdir -p _site/data
+          cp index.html .nojekyll _site/
+          cp 01_Marco_Estrategico_ANI_2027-2030.md _site/
+          cp 02_Plantilla_Ejercicio_PEI_2027-2030.csv _site/
+          cp 03_Canvas_2_Focos_ANI.html _site/
+          cp 04_App_Interactiva_ANI.md _site/
+          cp -r assets _site/
+          cp data/*.js _site/data/
+          test -f _site/index.html
+          test -f _site/assets/js/app.js
+          test -f _site/assets/css/styles.css
+          test -f _site/assets/bases_pnd_siete_ejes.png
+          test -f _site/assets/dofa_ani_estrategico.png
+          test -f _site/data/knowledge-base.js
+          test -f _site/data/media-manifest.js
+          # Verificación defensiva: cero secretos, código de servidor, scripts Python o bases SQLite
+          ! find _site \( -name ".env*" -o -name "*.mjs" -o -name "*.py" -o -name "*.pyc" -o -name "*.db" -o -name "*.sqlite*" \) | grep -q .
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: "_site"
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: verify
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Deploy to GitHub Pages
         id: deployment
