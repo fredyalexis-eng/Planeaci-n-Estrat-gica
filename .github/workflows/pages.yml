@@ -6,7 +6,9 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - "main"
+      - "arena/a38f63e1-planeaci-n-estrat-gica"
   workflow_dispatch:
 
 permissions:
