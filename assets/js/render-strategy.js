@@ -25,25 +25,61 @@ import {
   projValid,
   projScored,
   projCategory,
+  paValid,
   computeMetrics
 } from './state.js';
+
+function renderConsolidationRingSvg(pct) {
+  const safe = Math.max(0, Math.min(100, Number(pct) || 0));
+  const r = 46;
+  const circ = 2 * Math.PI * r;
+  const offset = (circ * (1 - safe / 100)).toFixed(2);
+  return `<svg viewBox="0 0 120 120" class="ring-svg" role="img" aria-label="Consolidación metodológica ${safe}%">
+    <defs>
+      <linearGradient id="aniRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0E9B9B"/>
+        <stop offset="65%" stop-color="#0B4F7C"/>
+        <stop offset="100%" stop-color="#F2A900"/>
+      </linearGradient>
+    </defs>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#E5ECF4" stroke-width="10"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="url(#aniRingGrad)" stroke-width="10"
+      stroke-linecap="round" stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset}"
+      transform="rotate(-90 60 60)"/>
+    <text x="60" y="57" text-anchor="middle" font-size="22" font-weight="850" fill="#0B2C4A">${safe}%</text>
+    <text x="60" y="73" text-anchor="middle" font-size="8.8" font-weight="700" fill="#5B6B7C" letter-spacing="0.4">CONSOLIDACIÓN</text>
+  </svg>`;
+}
 
 /* ==================== MÓDULO 01: CENTRO DE MANDO EJECUTIVO ==================== */
 export function renderDashboard(state) {
   const m = computeMetrics(state);
-  const f1Actions = state.actionPlan.filter((a) => a.foco === 'F1').length;
-  const f2Actions = state.actionPlan.filter((a) => a.foco === 'F2').length;
+  const f1Actions = m.paF1;
+  const f2Actions = m.paF2;
 
   const checklist = [
     ['Identidad y objetivos cargados', m.identityDone === 3, `${m.identityDone}/3`],
     ['7 Ejes del PND con relación ANI', m.axesDone === 7, `${m.axesDone}/7`],
     ['4 fichas documentales completas', m.docsDone === 4, `${m.docsDone}/4`],
     ['Cartera PEI iniciada', m.projTotal > 0, `${m.projTotal}`],
-    ['Filas PEI con 6 columnas válidas', m.projTotal > 0 && m.projOk === m.projTotal, `${m.projOk}/${m.projTotal}`],
+    ['PEI válido (6 columnas + R6)', m.projTotal > 0 && m.projOk === m.projTotal, `${m.projOk}/${m.projTotal}`],
     ['Scoring 1–5 completo', m.projTotal > 0 && state.projects.every(projScored), m.projTotal ? 'OK' : '0'],
     ['Doble llave F1↔F2 declarada', m.projTotal > 0 && m.projDoble === m.projTotal, `${m.projDoble}/${m.projTotal}`],
-    ['Plan de Acción vinculado', m.paTotal > 0, `${m.paTotal}`]
+    ['Plan de Acción válido (7 columnas)', m.paTotal > 0 && m.paOk === m.paTotal, `${m.paOk}/${m.paTotal}`],
+    ['Correspondencia PEI → Plan de Acción', m.projTotal > 0 && m.peiCovered === m.projTotal && m.paOrphans === 0, `${m.peiCovered}/${m.projTotal}`]
   ];
+
+  const pillars = [
+    { label: 'Identidad y Objetivos ANI', ratio: Math.round((m.identityDone / 3) * 100), meta: `${m.identityDone}/3`, mod: 'identity' },
+    { label: '7 Ejes del PND → ANI', ratio: Math.round((m.axesDone / 7) * 100), meta: `${m.axesDone}/7`, mod: 'pnd-docs' },
+    { label: 'Biblioteca Documental Base', ratio: Math.round((m.docsDone / 4) * 100), meta: `${m.docsDone}/4`, mod: 'pnd-docs' },
+    { label: 'Cartera PEI (6 columnas)', ratio: m.projTotal ? Math.round((m.projOk / m.projTotal) * 100) : 0, meta: `${m.projOk}/${m.projTotal}`, mod: 'pei' },
+    { label: 'Doble Llave F1 ↔ F2', ratio: m.projTotal ? Math.round((m.projDoble / m.projTotal) * 100) : 0, meta: `${m.projDoble}/${m.projTotal}`, mod: 'pei' },
+    { label: 'Plan de Acción (7 col. + PEI)', ratio: m.paTotal ? Math.round((m.paOk / m.paTotal) * 100) : 0, meta: `${m.paOk}/${m.paTotal}`, mod: 'action-plan' }
+  ];
+
+  const peiF1Pct = m.projTotal ? Math.round((m.projF1 / m.projTotal) * 100) : 50;
+  const paF1Pct = m.paTotal ? Math.round((f1Actions / m.paTotal) * 100) : 50;
 
   const docSummaryRows = BASE_DOC_SHEETS.map((d) => {
     const x = state.docs[d.id];
@@ -60,15 +96,27 @@ export function renderDashboard(state) {
         const cat = projCategory(p);
         return `<tr>
           <td>${p.foco ? `<span class="badge ${p.foco === 'F1' ? 'badge-teal' : 'badge-amber'}">${esc(p.foco)}</span>` : '—'}</td>
-          <td><b>${esc(p.proyecto || 'Sin nombre')}</b><br><small class="muted">${esc(p.objetivo || 'Objetivo pendiente')}</small></td>
+          <td>${esc(p.objetivo || 'Pendiente')}</td>
+          <td><b>${esc(p.proyecto || 'Sin nombre')}</b><br>${statusBadge(p.estatus)}</td>
           <td>${esc(p.unidad || '—')}</td>
-          <td>${esc(p.lineaBase || 'Pendiente')}</td>
-          <td>${esc(p.meta || 'Por definir')}</td>
+          <td><b>${esc(p.meta || 'Por definir')}</b><br><small class="muted">LB: ${esc(p.lineaBase || 'Pendiente')}</small></td>
+          <td style="max-width:250px">${esc(p.detalle || '—')}<br><small class="muted"><b>Doble llave:</b> ${esc(p.doble || 'Sin declarar')}</small></td>
           <td><span class="badge ${cat.cls}">${esc(cat.label)}</span></td>
-          <td>${statusBadge(p.estatus)}</td>
         </tr>`;
       }).join('')
     : `<tr><td colspan="7" class="muted">Sin proyectos registrados aún en la Cartera PEI 2027–2030. Inicie en el Módulo 06.</td></tr>`;
+
+  const paSummaryRows = state.actionPlan.length
+    ? state.actionPlan.map((a) => `<tr>
+        <td>${a.foco ? `<span class="badge ${a.foco === 'F1' ? 'badge-teal' : 'badge-amber'}">${esc(a.foco)}</span>` : '—'}</td>
+        <td>${esc(a.objetivo || 'Pendiente')}</td>
+        <td><b>${esc(a.proyectoNombre || 'Sin proyecto PEI')}</b></td>
+        <td><b>${esc(a.actividad || 'Sin nombre')}</b><br>${statusBadge(a.estatus)}</td>
+        <td><b>${esc(a.m2027 || 'Por definir')}</b></td>
+        <td>${esc(a.unidad || '—')}</td>
+        <td style="max-width:250px">${esc(a.detalle || a.entregable || '—')}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" class="muted">Sin actividades registradas aún en el Plan de Acción. Desagregue sus proyectos PEI en el Módulo 07.</td></tr>`;
 
   return `
   <div class="hero-banner">
@@ -89,35 +137,103 @@ export function renderDashboard(state) {
   </div>
 
   <div class="grid-6" style="margin-bottom:16px">
-    <div class="kpi-card">
+    <div class="kpi-card kpi-accent-navy">
       <span class="kpi-label">Avance Integral</span>
       <span class="kpi-value" data-kpi="pct">${m.pct}%</span>
       <span class="kpi-sub">Consolidación metodológica</span>
     </div>
-    <div class="kpi-card">
-      <span class="kpi-label">Cartera PEI</span>
+    <div class="kpi-card kpi-accent-teal">
+      <span class="kpi-label">Cartera PEI (6 col.)</span>
       <span class="kpi-value" data-kpi="projTotal">${m.projTotal}</span>
       <span class="kpi-sub" data-kpi="projSplit">F1: ${m.projF1} · F2: ${m.projF2} · Válidas: ${m.projOk}</span>
     </div>
-    <div class="kpi-card">
-      <span class="kpi-label">Plan de Acción</span>
+    <div class="kpi-card kpi-accent-amber">
+      <span class="kpi-label">Plan de Acción (7 col.)</span>
       <span class="kpi-value" data-kpi="paTotal">${m.paTotal}</span>
-      <span class="kpi-sub">Actividades 2027–2030</span>
+      <span class="kpi-sub">Válidas: ${m.paOk} · PEI cubiertos: ${m.peiCovered}/${m.projTotal}</span>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card kpi-accent-navy">
       <span class="kpi-label">Ejes del PND</span>
       <span class="kpi-value" data-kpi="axesDone">${m.axesDone}/7</span>
       <span class="kpi-sub">Con análisis ANI</span>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card kpi-accent-teal">
       <span class="kpi-label">Biblioteca</span>
       <span class="kpi-value" data-kpi="docsDone">${m.docsDone}/4</span>
       <span class="kpi-sub">+ 4 base repo · ${state.customDocs.length} ampliados</span>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card kpi-accent-amber">
       <span class="kpi-label">Oportunidades</span>
       <span class="kpi-value" data-kpi="oppTotal">${m.oppTotal}</span>
       <span class="kpi-sub">+ 6 recomendaciones R1–R6</span>
+    </div>
+  </div>
+
+  <!-- PANEL ANALÍTICO EJECUTIVO: CONSOLIDACIÓN, EQUILIBRIO F1↔F2 Y CADENA PEI→PA -->
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="card" style="margin:0">
+      <div class="card-header">
+        <div>
+          <h2>Tablero de Madurez Metodológica</h2>
+          <p class="muted">Progreso real verificable sobre los 6 pilares del ejercicio estratégico (sin cifras simuladas).</p>
+        </div>
+        <span class="badge badge-navy">${checklist.filter((c) => c[1]).length}/${checklist.length} hitos OK</span>
+      </div>
+      <div class="analytics-split">
+        <div class="ring-wrap">${renderConsolidationRingSvg(m.pct)}</div>
+        <div class="pillar-bars">
+          ${pillars.map((pl) => `<button type="button" class="pillar-row" onclick="ANI.go('${pl.mod}')">
+            <div class="pillar-row-top"><span>${esc(pl.label)}</span><b>${esc(pl.meta)} (${pl.ratio}%)</b></div>
+            <div class="mini-bar"><i style="width:${pl.ratio}%"></i></div>
+          </button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin:0">
+      <div class="card-header">
+        <div>
+          <h2>Equilibrio Doble Llave (F1 ↔ F2) y Trazabilidad PEI → PA</h2>
+          <p class="muted">Articulación en vivo entre Foco 1, Foco 2, Cartera PEI (Meta 2030) y Plan de Acción (Meta 2027).</p>
+        </div>
+        <button class="btn btn-soft btn-xs no-print" onclick="ANI.openCorrespondenceView()">Ver matriz PEI↔PA →</button>
+      </div>
+
+      <div class="balance-block">
+        <div class="pillar-row-top">
+          <span><b>Cartera PEI 2027–2030</b> (F1: ${m.projF1} · F2: ${m.projF2})</span>
+          <span class="badge ${m.projTotal === 0 ? 'badge-slate' : m.balancedFocos ? 'badge-ok' : 'badge-warn'}">
+            ${m.projTotal === 0 ? 'Sin filas aún' : m.balancedFocos ? 'F1 + F2 articulados' : 'Requiere contraparte F1/F2'}
+          </span>
+        </div>
+        <div class="dual-bar" title="Distribución Foco 1 vs Foco 2 en Cartera PEI">
+          <span class="dual-f1" style="width:${m.projTotal ? peiF1Pct : 0}%"></span>
+          <span class="dual-f2" style="width:${m.projTotal ? (100 - peiF1Pct) : 0}%"></span>
+        </div>
+      </div>
+
+      <div class="balance-block">
+        <div class="pillar-row-top">
+          <span><b>Plan de Acción</b> (F1: ${f1Actions} · F2: ${f2Actions})</span>
+          <span class="badge ${m.paTotal === 0 ? 'badge-slate' : m.paOrphans === 0 ? 'badge-ok' : 'badge-warn'}">
+            ${m.paTotal === 0 ? 'Sin actividades aún' : m.paOrphans === 0 ? '100% vinculado al PEI' : `${m.paOrphans} sin vincular`}
+          </span>
+        </div>
+        <div class="dual-bar" title="Distribución Foco 1 vs Foco 2 en Plan de Acción">
+          <span class="dual-f1" style="width:${m.paTotal ? paF1Pct : 0}%"></span>
+          <span class="dual-f2" style="width:${m.paTotal ? (100 - paF1Pct) : 0}%"></span>
+        </div>
+      </div>
+
+      <div class="trace-pipeline no-print">
+        <button type="button" class="pipe-step" onclick="ANI.go('pnd-docs')"><small>1. Mandatos</small><b>PND · ${m.axesDone}/7</b></button>
+        <span class="pipe-arrow" aria-hidden="true">→</span>
+        <button type="button" class="pipe-step" onclick="ANI.go('opportunities')"><small>2. Análisis</small><b>Oport. · ${m.oppTotal}</b></button>
+        <span class="pipe-arrow" aria-hidden="true">→</span>
+        <button type="button" class="pipe-step" onclick="ANI.go('pei')"><small>3. Meta 2030</small><b>PEI · ${m.projTotal}</b></button>
+        <span class="pipe-arrow" aria-hidden="true">→</span>
+        <button type="button" class="pipe-step" onclick="ANI.go('action-plan')"><small>4. Meta 2027</small><b>PA · ${m.paTotal}</b></button>
+      </div>
     </div>
   </div>
 
@@ -204,11 +320,18 @@ export function renderDashboard(state) {
         <tbody>${docSummaryRows}</tbody>
       </table>
     </div>
-    <h3>2. Cartera de Proyectos PEI 2027–2030</h3>
+    <h3>2. Cartera PEI 2027–2030 (Estructura Obligatoria — 6 Columnas)</h3>
+    <div class="table-wrap" style="margin-bottom:14px">
+      <table class="exec-table">
+        <thead><tr><th>Foco</th><th>Objetivo Estratégico</th><th>Proyecto</th><th>Unidad de medida</th><th>Meta 2030</th><th>Detalle</th><th>Priorización</th></tr></thead>
+        <tbody>${projSummaryRows}</tbody>
+      </table>
+    </div>
+    <h3>3. Plan de Acción (Estructura Obligatoria — 7 Columnas)</h3>
     <div class="table-wrap">
       <table class="exec-table">
-        <thead><tr><th>Foco</th><th>Proyecto y Objetivo</th><th>Unidad</th><th>Línea Base</th><th>Meta 2030</th><th>Categoría</th><th>Estatus</th></tr></thead>
-        <tbody>${projSummaryRows}</tbody>
+        <thead><tr><th>Foco</th><th>Objetivo Estratégico</th><th>Proyecto</th><th>Actividad</th><th>Meta 2027</th><th>Unidad de medida</th><th>Detalle</th></tr></thead>
+        <tbody>${paSummaryRows}</tbody>
       </table>
     </div>
   </div>`;
@@ -379,6 +502,53 @@ export function renderFocos(state, subtab = 'comparativa') {
           </div>
         </div>`;
       }).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Diagrama Ejecutivo de Articulación: Regla de Doble Llave F1 ↔ F2</h2>
+          <p class="muted">Acoplamiento obligatorio entre el portafolio físico multimodal (F1) y la viabilidad socio-territorial preventiva (F2) hacia PEI 2030 y Plan de Acción 2027.</p>
+        </div>
+        ${citeBadge('MARCO-S2.3')}
+      </div>
+      <div style="overflow-x:auto">
+        <svg viewBox="0 0 860 225" style="width:100%;min-width:620px;height:auto;display:block" role="img" aria-label="Diagrama de articulación Doble Llave Foco 1 y Foco 2 hacia PEI 2030 y Plan de Acción 2027">
+          <rect x="8" y="14" width="255" height="196" rx="12" fill="#F0FAFA" stroke="#0E9B9B" stroke-width="2"/>
+          <rect x="8" y="14" width="255" height="32" rx="12" fill="#0E9B9B"/>
+          <text x="135" y="35" text-anchor="middle" font-size="11.5" font-weight="800" fill="#fff">FOCO 1 · QUÉ SE CONSTRUYE</text>
+          <text x="22" y="68" font-size="11" font-weight="700" fill="#0B2C4A">5 Modos + Social/Productiva (R2)</text>
+          <text x="22" y="86" font-size="10.2" fill="#334558">Carretero · Férreo · Fluvial · Portuario · Aeroport.</text>
+          <line x1="22" y1="100" x2="248" y2="100" stroke="#CBE9E9"/>
+          <text x="22" y="119" font-size="10.5" font-weight="700" fill="#0B2C4A">6 Criterios Transversales:</text>
+          <text x="22" y="137" font-size="10" fill="#334558">• Seguridad vial  • Accesibilidad</text>
+          <text x="22" y="154" font-size="10" fill="#334558">• Resiliencia climática  • Sostenibilidad</text>
+          <text x="22" y="171" font-size="10" fill="#334558">• Innovación  • Gestión social</text>
+          <text x="22" y="196" font-size="9.6" font-weight="700" fill="#991B1B">Sin F2 → Obra bloqueada</text>
+
+          <rect x="304" y="52" width="192" height="122" rx="14" fill="#0B2C4A"/>
+          <text x="400" y="79" text-anchor="middle" font-size="11" font-weight="800" fill="#F2A900">DOBLE LLAVE ANI (R3)</text>
+          <text x="400" y="99" text-anchor="middle" font-size="10.2" fill="#E2E8F0">Correspondencia obligatoria</text>
+          <line x1="324" y1="111" x2="476" y2="111" stroke="#244C70"/>
+          <text x="400" y="131" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">PEI 2027–2030 (Meta 2030)</text>
+          <text x="400" y="148" text-anchor="middle" font-size="10" fill="#7CE0E0">↓ desagregación directa ↓</text>
+          <text x="400" y="164" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">Plan de Acción (Meta 2027)</text>
+
+          <line x1="263" y1="112" x2="304" y2="112" stroke="#0E9B9B" stroke-width="3"/>
+          <line x1="496" y1="112" x2="537" y2="112" stroke="#F2A900" stroke-width="3"/>
+
+          <rect x="537" y="14" width="315" height="196" rx="12" fill="#FFFBF0" stroke="#E59A00" stroke-width="2"/>
+          <rect x="537" y="14" width="315" height="32" rx="12" fill="#E59A00"/>
+          <text x="694" y="35" text-anchor="middle" font-size="11.5" font-weight="800" fill="#0B2C4A">FOCO 2 · CÓMO SE HACE VIABLE</text>
+          <text x="552" y="68" font-size="11" font-weight="700" fill="#0B2C4A">Ruta Social y Prevención de Conflictos</text>
+          <text x="552" y="86" font-size="10.2" fill="#334558">Alertas tempranas · Conocimiento territorial · Diálogo</text>
+          <line x1="552" y1="100" x2="836" y2="100" stroke="#F3DF9E"/>
+          <text x="552" y="119" font-size="10.5" font-weight="700" fill="#0B2C4A">5 Capacidades Institucionales (R4):</text>
+          <text x="552" y="137" font-size="10" fill="#334558">• Social  • Jurídica  • Ambiental</text>
+          <text x="552" y="154" font-size="10" fill="#334558">• Predial  • Tecnológica (alertas y datos)</text>
+          <text x="552" y="171" font-size="10" fill="#334558">Protege recursos públicos y reduce demandas</text>
+          <text x="552" y="196" font-size="9.6" font-weight="700" fill="#991B1B">Sin F1 → Gestión sin resultado físico</text>
+        </svg>
+      </div>
     </div>
     <div class="card">
       <div class="card-header">

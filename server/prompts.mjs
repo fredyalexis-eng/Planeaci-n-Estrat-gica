@@ -29,7 +29,7 @@ export const AGENT_MODES = {
   },
   propuesta_pa: {
     label: 'Propuesta de actividades para el Plan de Acción',
-    instruction: 'Formula propuestas de actividades concretas para el Plan de Acción 2027–2030 vinculadas a Foco 1 o Foco 2 y a los proyectos PEI disponibles, indicando entregable, indicador de gestión, unidad, hitos orientativos 2027–2030 ("Por definir" cuando dependa de línea base o presupuesto), rol responsable y riesgos. Incluye al final un bloque <ani_proposals> con las actividades propuestas como BORRADOR NO APROBADO.'
+    instruction: 'Formula propuestas de actividades concretas para el Plan de Acción cumpliendo la estructura obligatoria de 7 columnas (Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle) en correspondencia directa con los proyectos del PEI 2027–2030 y la Doble Llave F1↔F2, indicando Meta 2027 como "Por definir — línea base pendiente" cuando no exista línea base verificada, además de entregable, indicador, responsable y riesgos. Incluye al final un bloque <ani_proposals> con las actividades propuestas como BORRADOR NO APROBADO.'
   },
   auditoria: {
     label: 'Auditoría de trazabilidad y Doble Llave',
@@ -73,16 +73,18 @@ Solo cuando el modo o el usuario pida proponer proyectos PEI, actividades del Pl
   "actionItems": [
     {
       "foco": "F2",
+      "objetivo": "Información insuficiente para concluir — levantar objetivo vigente ANI",
       "proyectoNombre": "Proyecto PEI asociado",
       "actividad": "Descripción concreta de la actividad",
+      "m2027": "Por definir — línea base pendiente",
+      "unidad": "Unidad de medida única",
+      "detalle": "Alcance técnico, entregable, articulación F1↔F2, supuestos y verificación.",
       "entregable": "Producto verificable",
       "indicador": "Nombre del indicador de gestión",
-      "unidad": "Unidad única",
       "responsable": "Rol o dependencia sugerida",
-      "m2027": "Hito 2027 (por validar)",
-      "m2028": "Hito 2028 (por validar)",
-      "m2029": "Hito 2029 (por validar)",
-      "m2030": "Hito 2030 (por validar)",
+      "m2028": "Por definir",
+      "m2029": "Por definir",
+      "m2030": "Por definir",
       "presupuesto": "Por definir — restricción presupuestal pendiente",
       "riesgo": "Riesgo principal y mitigación",
       "citations": ["MARCO-S3.7"]
@@ -156,13 +158,15 @@ export function parseAndVerifyAgentOutput(rawText, validChunksMap) {
       if (Array.isArray(parsed?.actionItems)) {
         proposals.actionItems = parsed.actionItems.slice(0, 8).map((a) => ({
           foco: a?.foco === 'F2' ? 'F2' : 'F1',
-          proyectoNombre: String(a?.proyectoNombre || '').slice(0, 240),
+          objetivo: String(a?.objetivo || 'Información insuficiente para concluir — levantar objetivo vigente ANI').slice(0, 400),
+          proyectoNombre: String(a?.proyectoNombre || a?.proyecto || '').slice(0, 240),
           actividad: String(a?.actividad || 'Actividad propuesta').slice(0, 300),
           entregable: String(a?.entregable || '').slice(0, 240),
           indicador: String(a?.indicador || '').slice(0, 240),
           unidad: String(a?.unidad || 'Por definir').slice(0, 80),
+          detalle: String(a?.detalle || a?.entregable || 'Alcance técnico sujeto a validación institucional ANI.').slice(0, 1500),
           responsable: String(a?.responsable || 'Por asignar').slice(0, 140),
-          m2027: String(a?.m2027 || 'Por definir').slice(0, 140),
+          m2027: String(a?.m2027 || 'Por definir — línea base pendiente').slice(0, 140),
           m2028: String(a?.m2028 || 'Por definir').slice(0, 140),
           m2029: String(a?.m2029 || 'Por definir').slice(0, 140),
           m2030: String(a?.m2030 || 'Por definir').slice(0, 140),

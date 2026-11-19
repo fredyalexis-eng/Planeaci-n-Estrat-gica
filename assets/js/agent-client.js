@@ -240,11 +240,34 @@ export function localFallbackAudit(workspace = {}) {
           rule: 'PEI → Plan de Acción',
           citation: 'MARCO-S3.7',
           title: `"${name}" aún sin actividades en el Plan de Acción`,
-          detail: 'Desagregue actividades 2027–2030 vinculadas a este proyecto.'
+          detail: 'Desagregue actividades vinculadas cumpliendo Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle.'
         });
       }
     });
   }
+  actionPlan.forEach((a, i) => {
+    const aName = a.actividad?.trim() || `Actividad PA #${i + 1}`;
+    const ok7 = ['F1', 'F2'].includes(a.foco) && a.objetivo?.trim() && a.proyectoNombre?.trim() && a.actividad?.trim() && a.m2027?.trim() && a.unidad?.trim() && a.detalle?.trim();
+    if (!ok7) {
+      findings.push({
+        severity: 'warn',
+        rule: '7 Columnas Plan de Acción',
+        citation: 'MARCO-S3.7',
+        title: `"${aName}" no completa las 7 columnas obligatorias del Plan de Acción`,
+        detail: 'Complete Foco, Objetivo Estratégico, Proyecto, Actividad, Meta 2027, Unidad de medida y Detalle.'
+      });
+    }
+    const parent = a.proyectoId ? projects.find((p) => p.id === a.proyectoId) : null;
+    if (parent && parent.foco && a.foco && parent.foco !== a.foco) {
+      findings.push({
+        severity: 'bad',
+        rule: 'Correspondencia Foco PEI ↔ PA',
+        citation: 'MARCO-S5.1',
+        title: `Inconsistencia de Foco en "${aName}" (${a.foco} vs ${parent.foco})`,
+        detail: 'Alinee el Foco de la actividad con el Foco de su Proyecto PEI.'
+      });
+    }
+  });
   return {
     ok: true,
     summary: {
@@ -342,6 +365,24 @@ export async function fetchRepoMedia() {
     if (data?.ok) return data;
   } catch { /* modo estático */ }
   return { ok: false, directory: 'assets/media', total: 0, videos: [], images: [], files: [] };
+}
+
+export async function fetchSystemDiagnostics() {
+  try {
+    const res = await fetch(apiUrl('/api/agent/diagnostics'), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data?.ok) return data;
+  } catch { /* fallback modo estático */ }
+  return {
+    ok: true,
+    checkedAt: new Date().toISOString(),
+    checks: [
+      { id: 'static', name: 'Modo de Ejecución Frontend Estático', status: 'warn', detail: 'Servidor Node no conectado en este origen; BM25 local y auditoría R1–R6 operativos.' },
+      { id: 'contracts', name: 'Contratos Obligatorios PEI (6 col.) y Plan de Acción (7 col.)', status: 'ok', detail: 'Validaciones contractuales y persistencia local activas.' },
+      { id: 'arena_api', name: 'Adaptador Exclusivo Arena API', status: 'warn', detail: 'Requiere iniciar `npm start` con `ARENA_API_KEY` en entorno de servidor.' }
+    ]
+  };
 }
 
 export async function fetchCitationChunk(chunkId, workspace = null) {

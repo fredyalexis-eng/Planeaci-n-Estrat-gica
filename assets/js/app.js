@@ -28,9 +28,14 @@ import {
   projScore,
   projCategory,
   projHasBaselineIssue,
+  paValid,
+  paChecklist,
+  paHasBaselineIssue,
+  syncActionPlanWithProject,
   computeMetrics,
   buildPeiCsv,
   buildActionPlanCsv,
+  buildActionPlanTemplateCsv,
   buildOpportunitiesCsv,
   importPeiFromCsv,
   importActionPlanFromCsv
@@ -57,6 +62,7 @@ import {
   runAudit,
   fetchCitationChunk,
   fetchRepoMedia,
+  fetchSystemDiagnostics,
   sendAgentMessage,
   setBackendBase,
   apiUrl
@@ -115,7 +121,8 @@ export function createAniApp() {
     busy: false,
     searchQuery: '',
     searchResults: null,
-    auditReport: null
+    auditReport: null,
+    diagnostics: null
   };
 
   const $ = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
@@ -287,6 +294,30 @@ export function createAniApp() {
     const r6El = document.querySelector(`[data-proj-r6="${id}"]`);
     if (r6El) {
       r6El.style.display = projHasBaselineIssue(p) ? '' : 'none';
+    }
+  }
+
+  function patchActionHeadDom(id) {
+    if (typeof document === 'undefined') return;
+    const a = state.actionPlan.find((x) => x.id === id);
+    if (!a) return;
+    const titleEl = document.querySelector(`[data-pa-title="${id}"]`);
+    if (titleEl) titleEl.textContent = a.actividad || 'Actividad en formulación';
+    const validEl = document.querySelector(`[data-pa-valid="${id}"]`);
+    const ok = paValid(a) && !paHasBaselineIssue(a);
+    if (validEl) {
+      validEl.className = `badge ${ok ? 'badge-ok' : 'badge-warn'}`;
+      validEl.textContent = ok ? 'Fila válida (7 col.)' : 'Incompleta / revisar';
+    }
+    const checksEl = document.querySelector(`[data-pa-checks="${id}"]`);
+    if (checksEl) {
+      checksEl.innerHTML = paChecklist(a, state.projects)
+        .map(([lbl, cOk]) => `<span class="badge ${cOk ? 'badge-ok' : 'badge-warn'}">${cOk ? '✓' : '○'} ${esc(lbl)}</span>`)
+        .join('');
+    }
+    const r6El = document.querySelector(`[data-pa-r6="${id}"]`);
+    if (r6El) {
+      r6El.style.display = paHasBaselineIssue(a) ? '' : 'none';
     }
   }
 
@@ -697,8 +728,27 @@ export function createAniApp() {
       const p = state.projects.find((x) => x.id === id);
       if (!p) return;
       p[key] = val;
+      if (key === 'foco' || key === 'objetivo' || key === 'proyecto') {
+        syncActionPlanWithProject(state, p);
+      }
       save(rerender);
       if (!rerender) patchProjectHeadDom(id);
+    },
+    pairDoubleKeyProject(id, targetId) {
+      const p = state.projects.find((x) => x.id === id);
+      if (!p) return;
+      const target = targetId ? state.projects.find((x) => x.id === targetId) : null;
+      p.dobleProyectoId = target ? target.id : '';
+      if (target) {
+        p.doble = `[${target.foco || 'F1/F2'}] ${target.proyecto || 'Proyecto complementario'}`;
+        // Emparejamiento recíproco si la contraparte aún no tenía doble llave
+        if (!target.dobleProyectoId && !target.doble?.trim()) {
+          target.dobleProyectoId = p.id;
+          target.doble = `[${p.foco || 'F1/F2'}] ${p.proyecto || 'Proyecto complementario'}`;
+        }
+        toast('Doble llave F1 ↔ F2 vinculada entre proyectos');
+      }
+      save(true);
     },
     toggleProjCriterio(id, tag) {
       const p = state.projects.find((x) => x.id === id);
@@ -750,6 +800,10 @@ export function createAniApp() {
       ui.paTab = tab;
       renderActiveModule();
     },
+    openCorrespondenceView() {
+      ui.paTab = 'correspondencia';
+      api.go('action-plan');
+    },
     setPaFilter(val) {
       ui.paFilter = val;
       renderActiveModule();
@@ -777,7 +831,12 @@ export function createAniApp() {
     },
     addActionItem(overrides = {}) {
       const code = `PA-${String(state.actionPlan.length + 1).padStart(2, '0')}`;
-      state.actionPlan.unshift(createActionItem({ codigo: code, foco: ui.paFilter || '', ...overrides }));
+      state.actionPlan.unshift(createActionItem({
+        codigo: code,
+        foco: ui.paFilter || '',
+        m2027: 'Por definir — línea base pendiente',
+        ...overrides
+      }));
       save(true);
       toast('Actividad del Plan de Acción creada');
     },
@@ -787,25 +846,50 @@ export function createAniApp() {
       const code = `PA-${String(state.actionPlan.length + 1).padStart(2, '0')}`;
       state.actionPlan.unshift(createActionItem({
         codigo: code,
+        foco: p.foco || 'F1',
+        objetivo: p.objetivo || 'Información insuficiente para concluir — levantar objetivo vigente ANI',
         proyectoId: p.id,
         proyectoNombre: p.proyecto || 'Proyecto PEI',
-        foco: p.foco || 'F1',
+        unidad: p.unidad || '',
+        lineaBase: p.lineaBase || 'Información insuficiente para concluir',
+        m2027: 'Por definir — línea base pendiente',
+        m2030: p.meta || '',
         estatus: p.estatus === 'propuesta_ia' ? 'propuesta_ia' : 'en_construccion'
       }));
       ui.paTab = 'fichas';
       ui.paFilter = '';
+      ui.paEstadoFilter = '';
+      ui.searchPa = '';
       save(false);
       api.go('action-plan');
-      toast('Actividad vinculada al proyecto PEI');
+      toast('Actividad vinculada con Foco y Objetivo Estratégico del proyecto PEI');
     },
     linkActionProject(actionId, projId) {
       const a = state.actionPlan.find((x) => x.id === actionId);
       const p = state.projects.find((x) => x.id === projId);
       if (!a) return;
       a.proyectoId = projId;
-      a.proyectoNombre = p ? p.proyecto : '';
-      if (p?.foco) a.foco = p.foco;
+      if (p) {
+        a.proyectoNombre = p.proyecto || '';
+        if (p.foco) a.foco = p.foco;
+        if (p.objetivo?.trim()) a.objetivo = p.objetivo;
+        if (!a.unidad?.trim() && p.unidad?.trim()) a.unidad = p.unidad;
+      }
       save(true);
+    },
+    syncAllPaFromPei() {
+      let total = 0;
+      for (const a of state.actionPlan) {
+        if (!a.proyectoId && a.proyectoNombre?.trim()) {
+          const match = state.projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === a.proyectoNombre.trim().toLowerCase());
+          if (match) a.proyectoId = match.id;
+        }
+      }
+      for (const p of state.projects) {
+        total += syncActionPlanWithProject(state, p);
+      }
+      save(true);
+      toast(`Correspondencia PEI → Plan de Acción sincronizada (${total} actividad(es))`);
     },
     setAction(id, key, val, rerender = false) {
       const a = state.actionPlan.find((x) => x.id === id);
@@ -815,11 +899,8 @@ export function createAniApp() {
         const av = $(`pa-av-${id}`);
         if (av) av.textContent = String(a.avance);
       }
-      if (key === 'actividad' && typeof document !== 'undefined') {
-        const t = document.querySelector(`[data-pa-title="${id}"]`);
-        if (t) t.textContent = a.actividad || 'Actividad en formulación';
-      }
       save(rerender);
+      if (!rerender) patchActionHeadDom(id);
     },
     dupActionItem(id) {
       const orig = state.actionPlan.find((x) => x.id === id);
@@ -916,6 +997,18 @@ export function createAniApp() {
       const errBox = el.parentElement?.querySelector?.('.media-error-box');
       if (errBox) errBox.hidden = false;
     },
+    setVideoRate(btn, rate) {
+      const card = btn?.closest?.('.media-slot-card');
+      const vid = card?.querySelector?.('video');
+      if (!vid) return;
+      vid.playbackRate = Number(rate) || 1;
+      toast(`Velocidad de reproducción: ${vid.playbackRate}×`);
+    },
+    toggleCanvasHeight() {
+      const fr = $('aniCanvasFrame');
+      if (!fr) return;
+      fr.classList.toggle('expanded');
+    },
     addMediaItem(tipo = 'video') {
       const cleanTipo = tipo === 'imagen' ? 'imagen' : 'video';
       state.mediaAssets.unshift(createMediaItem({ tipo: cleanTipo, foco: 'F1+F2' }));
@@ -948,6 +1041,12 @@ export function createAniApp() {
       agentUi.toolTab = tab;
       renderActiveModule();
       if (tab === 'auditor' && !agentUi.auditReport) api.executeAudit();
+      if (tab === 'diagnostico' && !agentUi.diagnostics) api.runDiagnostics();
+    },
+    async runDiagnostics() {
+      agentUi.diagnostics = await fetchSystemDiagnostics();
+      if (ui.activeModule === 'agent' && agentUi.toolTab === 'diagnostico') renderActiveModule();
+      toast('Diagnóstico técnico actualizado');
     },
     openAuditTab() {
       agentUi.toolTab = 'auditor';
@@ -1109,8 +1208,11 @@ export function createAniApp() {
         state.actionPlan.unshift(createActionItem({
           ...a,
           codigo: code,
+          foco: linked?.foco || a.foco || 'F1',
+          objetivo: linked?.objetivo || a.objetivo || 'Información insuficiente para concluir — levantar objetivo vigente ANI',
           proyectoId: linked ? linked.id : '',
           proyectoNombre: linked ? linked.proyecto : (a.proyectoNombre || ''),
+          detalle: a.detalle || a.entregable || '',
           estatus: 'propuesta_ia',
           estado: 'Propuesta IA — No aprobada'
         }));
@@ -1164,6 +1266,10 @@ export function createAniApp() {
     exportActionCsv() {
       api.closeDropdowns();
       downloadFile('ANI_Plan_Accion_2027-2030.csv', buildActionPlanCsv(state.actionPlan), 'text/csv;charset=utf-8');
+    },
+    exportActionTemplateCsv() {
+      api.closeDropdowns();
+      downloadFile('Plantilla_Plan_Accion_ANI_2027.csv', buildActionPlanTemplateCsv(), 'text/csv;charset=utf-8');
     },
     exportOppCsv() {
       api.closeDropdowns();

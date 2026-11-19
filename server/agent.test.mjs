@@ -15,12 +15,16 @@ import {
   migrateState,
   buildPeiCsv,
   buildActionPlanCsv,
+  buildActionPlanTemplateCsv,
   buildOpportunitiesCsv,
   importPeiFromCsv,
   importActionPlanFromCsv,
   projValid,
   projCategory,
-  projHasBaselineIssue
+  projHasBaselineIssue,
+  paValid,
+  paHasBaselineIssue,
+  computeCorrespondence
 } from '../assets/js/state.js';
 import { renderMedia, renderChatFeedHtml } from '../assets/js/render-execution.js';
 import { sanitizeMediaUrl } from '../data/media-manifest.js';
@@ -581,9 +585,155 @@ test('9. Tablas ejecutivas (PEI, Plan de Acción, Oportunidades) y round-trip CS
     app.setMediaTab(mt);
     assert.ok(app.renderModuleHtml('media').length > 300);
   }
-  for (const at of ['chat', 'buscador', 'auditor']) {
+  for (const at of ['chat', 'buscador', 'auditor', 'diagnostico']) {
     app.setAgentTab(at);
     assert.ok(app.renderModuleHtml('agent').length > 300);
+  }
+});
+
+test('10. Estructuras obligatorias PEI (6 col.) y Plan de Acción (7 col.), Doble Llave F1↔F2, correspondencia PEI↔PA y diagnóstico', async () => {
+  const mem = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => mem.get(k) ?? null,
+    setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: (k) => mem.delete(k)
+  };
+  globalThis.confirm = () => true;
+
+  const app = createAniApp();
+
+  // Crear F1 y F2 en Cartera PEI y emparejar Doble Llave bidireccional
+  app.addProject('F1');
+  const f1 = app.getState().projects[0];
+  app.setProj(f1.id, 'objetivo', 'Información insuficiente para concluir — OE-F1');
+  app.setProj(f1.id, 'proyecto', 'Corredor Multimodal Pacífico');
+  app.setProj(f1.id, 'unidad', 'km');
+  app.setProj(f1.id, 'meta', 'Por definir — línea base pendiente');
+  app.setProj(f1.id, 'detalle', 'Seguridad vial, accesibilidad y resiliencia climática');
+
+  app.addProject('F2');
+  const f2 = app.getState().projects[0];
+  app.setProj(f2.id, 'objetivo', 'Información insuficiente para concluir — OE-F2');
+  app.setProj(f2.id, 'proyecto', 'Ruta Social Preventiva Pacífico');
+  app.setProj(f2.id, 'unidad', '% casos atendidos');
+  app.setProj(f2.id, 'meta', 'Por definir — línea base pendiente');
+  app.setProj(f2.id, 'detalle', 'Capacidades social, jurídica, ambiental, predial y tecnológica');
+
+  app.pairDoubleKeyProject(f1.id, f2.id);
+  assert.equal(f1.dobleProyectoId, f2.id);
+  assert.equal(f2.dobleProyectoId, f1.id);
+  assert.match(f1.doble, /Ruta Social Preventiva Pacífico/);
+  assert.match(f2.doble, /Corredor Multimodal Pacífico/);
+
+  // Verificar columnas exactas PEI: Foco | Objetivo Estratégico | Proyecto | Unidad de medida | Meta 2030 | Detalle
+  app.setPeiTab('tabla');
+  const peiHtml = app.renderModuleHtml('pei');
+  for (const col of ['<th>Foco</th>', '<th>Objetivo Estratégico</th>', '<th>Proyecto</th>', '<th>Unidad de medida</th>', '<th>Meta 2030</th>', '<th>Detalle</th>']) {
+    assert.ok(peiHtml.includes(col), `Falta columna obligatoria PEI: ${col}`);
+  }
+
+  // Derivar Plan de Acción desde F1 y F2: hereda Foco, Objetivo Estratégico y Proyecto
+  app.addActionForProject(f1.id);
+  const a1 = app.getState().actionPlan[0];
+  assert.equal(a1.foco, 'F1');
+  assert.equal(a1.objetivo, f1.objetivo);
+  assert.equal(a1.proyectoNombre, f1.proyecto);
+  app.setAction(a1.id, 'actividad', 'Estructuración técnica y predial tramo prioritario');
+  app.setAction(a1.id, 'm2027', 'Por definir — línea base pendiente');
+  app.setAction(a1.id, 'unidad', 'documento');
+  app.setAction(a1.id, 'detalle', 'Estudios y protocolos articulados con Ruta Social F2');
+  assert.equal(paValid(a1), true);
+  assert.equal(paHasBaselineIssue(a1), false);
+
+  app.addActionForProject(f2.id);
+  const a2 = app.getState().actionPlan[0];
+  app.setAction(a2.id, 'actividad', 'Despliegue de alertas tempranas y diálogo permanente');
+  app.setAction(a2.id, 'm2027', 'Por definir — línea base pendiente');
+  app.setAction(a2.id, 'unidad', 'protocolo');
+  app.setAction(a2.id, 'detalle', 'Cobertura preventiva en corredor Pacífico');
+  assert.equal(paValid(a2), true);
+
+  // Sincronización automática en cascada al editar Objetivo Estratégico en PEI
+  app.setProj(f1.id, 'objetivo', 'OE-01 Conectividad Multimodal Sostenible');
+  assert.equal(a1.objetivo, 'OE-01 Conectividad Multimodal Sostenible');
+
+  // Verificar columnas exactas Plan de Acción: Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle
+  app.setPaTab('tabla');
+  const paHtml = app.renderModuleHtml('action-plan');
+  for (const col of ['<th>Foco</th>', '<th>Objetivo Estratégico</th>', '<th>Proyecto</th>', '<th>Actividad</th>', '<th>Meta 2027</th>', '<th>Unidad de medida</th>', '<th>Detalle</th>']) {
+    assert.ok(paHtml.includes(col), `Falta columna obligatoria Plan de Acción: ${col}`);
+  }
+
+  // Verificar vista de correspondencia PEI ↔ PA al 100%
+  app.setPaTab('correspondencia');
+  const corrHtml = app.renderModuleHtml('action-plan');
+  const corr = computeCorrespondence(app.getState());
+  assert.equal(corr.coveragePct, 100);
+  assert.equal(corr.doubleKeyPct, 100);
+  assert.equal(corr.orphanActions.length, 0);
+  assert.equal(corr.focoMismatches.length, 0);
+  assert.ok(corrHtml.includes('100%'));
+
+  // Importación de CSV puro de 7 columnas obligatorias y plantilla oficial
+  const tmpl = buildActionPlanTemplateCsv();
+  assert.match(tmpl, /"FOCO","OBJETIVO ESTRATÉGICO","PROYECTO","ACTIVIDAD","META 2027","UNIDAD DE MEDIDA","DETALLE"/);
+  const pure7Csv = `${tmpl}\n"F1","OE-01 Conectividad Multimodal Sostenible","Corredor Multimodal Pacífico","Hito intermodal 2027","Por definir — línea base pendiente","hito","Integración nodo férreo-portuario"`;
+  const imp7 = importActionPlanFromCsv(pure7Csv, app.getState().projects);
+  assert.equal(imp7.length, 1);
+  assert.equal(imp7[0].proyectoId, f1.id);
+  assert.equal(paValid(imp7[0]), true);
+
+  // Retrocompatibilidad con CSV legado de 18 columnas y JSON estilo Streamlit
+  const legacyPaCsv = '"CÓDIGO","FOCO","PROYECTO PEI ASOCIADO","ACTIVIDAD","ENTREGABLE","INDICADOR","UNIDAD","LÍNEA BASE","META 2027","META 2028","META 2029","META 2030","RESPONSABLE","PRESUPUESTO","RIESGO","ESTADO","AVANCE %","ESTATUS"\n"PA-09","F2","Ruta Social Preventiva Pacífico","Mesa territorial","Acta","Mesas","mesa","Pendiente","Por definir","","","Planeación","","","Programada","20","en_construccion"';
+  const impLeg = importActionPlanFromCsv(legacyPaCsv, app.getState().projects);
+  assert.equal(impLeg.length, 1);
+  assert.equal(impLeg[0].proyectoId, f2.id);
+  assert.equal(impLeg[0].objetivo, f2.objetivo);
+
+  const stMigrated = migrateState({
+    proyectos_pei: [{ Foco: 'F1', 'Objetivo Estratégico': 'OE-X', Proyecto: 'Nodo Portuario', 'Unidad de medida': 'nodo', 'Meta 2030': 'Por definir', Detalle: 'Eficiencia logística' }],
+    plan_accion: [{ Foco: 'F1', Proyecto: 'Nodo Portuario', Actividad: 'Estudio acceso', 'Meta 2027': 'Por definir', 'Unidad de medida': 'estudio', Detalle: 'Alcance 2027' }]
+  });
+  assert.equal(projValid(stMigrated.projects[0]), true);
+  assert.equal(paValid(stMigrated.actionPlan[0]), true);
+  assert.equal(stMigrated.actionPlan[0].objetivo, 'OE-X');
+
+  // Diagnóstico técnico del servidor + detección de inconsistencia de Foco PEI↔PA en auditoría
+  const srv = await startTestServer({});
+  try {
+    const diag = await (await fetch(`${srv.baseUrl}/api/agent/diagnostics`)).json();
+    assert.equal(diag.ok, true);
+    assert.equal(diag.checks.length, 6);
+    assert.ok(diag.checks.filter((c) => c.status === 'ok').length >= 4);
+
+    // Auditoría limpia sobre cartera válida y articulada (0 críticos)
+    const cleanAudit = await (await fetch(`${srv.baseUrl}/api/agent/audit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspace: app.getState() })
+    })).json();
+    assert.equal(cleanAudit.summary.critical, 0);
+
+    // Detectar inconsistencia deliberada de Foco PEI vs PA
+    const badState = JSON.parse(JSON.stringify(app.getState()));
+    badState.actionPlan[0].foco = 'F1'; // su proyecto padre es F2
+    const mismatchAudit = await (await fetch(`${srv.baseUrl}/api/agent/audit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspace: badState })
+    })).json();
+    assert.ok(mismatchAudit.findings.some((f) => f.rule === 'Correspondencia Foco PEI ↔ PA'));
+  } finally {
+    await srv.close();
+  }
+
+  // Verificar que el 100% de manejadores ANI.* en plantillas existan en el controlador
+  const apiKeys = new Set(Object.keys(app));
+  for (const rel of ['index.html', 'assets/js/render-strategy.js', 'assets/js/render-execution.js']) {
+    const src = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+    for (const m of src.matchAll(/ANI\.([A-Za-z0-9_]+)\s*\(/g)) {
+      assert.ok(apiKeys.has(m[1]), `Manejador faltante en ${rel}: ANI.${m[1]}`);
+    }
   }
 });
 

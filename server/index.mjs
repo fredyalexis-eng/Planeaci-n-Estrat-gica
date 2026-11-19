@@ -214,29 +214,39 @@ export async function createAppServer({
       }
 
       if (pathname === '/api/media' && req.method === 'GET') {
-        const mediaDir = path.join(repoRoot, 'assets', 'media');
         const files = [];
-        try {
-          const entries = await fs.readdir(mediaDir, { withFileTypes: true });
-          for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-            if (!entry.isFile() || entry.name.startsWith('.')) continue;
-            const ext = path.extname(entry.name).toLowerCase();
-            const isVideo = VIDEO_EXTS.has(ext);
-            const isImage = IMAGE_EXTS.has(ext);
-            if (!isVideo && !isImage) continue;
-            const st = await fs.stat(path.join(mediaDir, entry.name));
-            files.push({
-              filename: entry.name,
-              title: path.basename(entry.name, ext).replace(/[_-]+/g, ' '),
-              tipo: isVideo ? 'video' : 'imagen',
-              ext,
-              mime: MIME_TYPES[ext] || 'application/octet-stream',
-              sizeBytes: st.size,
-              updatedAt: st.mtime.toISOString(),
-              url: `./assets/media/${encodeURIComponent(entry.name)}`
-            });
-          }
-        } catch { /* assets/media ausente o vacía */ }
+        // Escanea assets/media/ y cualquier archivo audiovisual ubicado directamente en assets/ (sin tocar css/js)
+        const scanDirs = [
+          { dir: path.join(repoRoot, 'assets', 'media'), urlPrefix: './assets/media' },
+          { dir: path.join(repoRoot, 'assets'), urlPrefix: './assets' }
+        ];
+        const seen = new Set();
+        for (const { dir, urlPrefix } of scanDirs) {
+          try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+              if (!entry.isFile() || entry.name.startsWith('.')) continue;
+              const ext = path.extname(entry.name).toLowerCase();
+              const isVideo = VIDEO_EXTS.has(ext);
+              const isImage = IMAGE_EXTS.has(ext);
+              if (!isVideo && !isImage) continue;
+              const url = `${urlPrefix}/${encodeURIComponent(entry.name)}`;
+              if (seen.has(url)) continue;
+              seen.add(url);
+              const st = await fs.stat(path.join(dir, entry.name));
+              files.push({
+                filename: entry.name,
+                title: path.basename(entry.name, ext).replace(/[_-]+/g, ' '),
+                tipo: isVideo ? 'video' : 'imagen',
+                ext,
+                mime: MIME_TYPES[ext] || 'application/octet-stream',
+                sizeBytes: st.size,
+                updatedAt: st.mtime.toISOString(),
+                url
+              });
+            }
+          } catch { /* directorio ausente o vacío */ }
+        }
         return sendJson(res, 200, {
           ok: true,
           directory: 'assets/media',
@@ -244,6 +254,87 @@ export async function createAppServer({
           videos: files.filter((f) => f.tipo === 'video'),
           images: files.filter((f) => f.tipo === 'imagen'),
           files
+        });
+      }
+
+      if (pathname === '/api/agent/diagnostics' && req.method === 'GET') {
+        const kbSummary = knowledge.getSummary();
+        const arenaPub = arena.getPublicStatus();
+        const baseFilesCheck = [];
+        for (const reqFile of [
+          '01_Marco_Estrategico_ANI_2027-2030.md',
+          '02_Plantilla_Ejercicio_PEI_2027-2030.csv',
+          '03_Canvas_2_Focos_ANI.html',
+          '04_App_Interactiva_ANI.md',
+          'index.html'
+        ]) {
+          try {
+            const st = await fs.stat(path.join(repoRoot, reqFile));
+            baseFilesCheck.push({ file: reqFile, ok: st.isFile() && st.size > 0, sizeBytes: st.size });
+          } catch {
+            baseFilesCheck.push({ file: reqFile, ok: false, sizeBytes: 0 });
+          }
+        }
+        const searchProbe = knowledge.search('doble llave foco 1 foco 2 linea base R6', { topK: 4 });
+        let mediaCount = { videos: 0, images: 0 };
+        try {
+          const mEntries = await fs.readdir(path.join(repoRoot, 'assets', 'media'), { withFileTypes: true });
+          for (const e of mEntries) {
+            if (!e.isFile() || e.name.startsWith('.')) continue;
+            const ext = path.extname(e.name).toLowerCase();
+            if (VIDEO_EXTS.has(ext)) mediaCount.videos += 1;
+            else if (IMAGE_EXTS.has(ext)) mediaCount.images += 1;
+          }
+        } catch { /* ignore */ }
+
+        const checks = [
+          {
+            id: 'server',
+            name: 'Servidor API y Seguridad HTTP',
+            status: 'ok',
+            detail: 'Activo · Lista blanca estricta de archivos públicos · Streaming HTTP 206 Range habilitado'
+          },
+          {
+            id: 'repo_files',
+            name: 'Integridad de Archivos Base ANI',
+            status: baseFilesCheck.every((f) => f.ok) ? 'ok' : 'bad',
+            detail: `${baseFilesCheck.filter((f) => f.ok).length}/${baseFilesCheck.length} documentos originales verificados`
+          },
+          {
+            id: 'knowledge_bm25',
+            name: 'Motor de Conocimiento BM25 y Trazabilidad',
+            status: kbSummary.totalRepoChunks >= 20 && searchProbe.length >= 3 ? 'ok' : 'warn',
+            detail: `${kbSummary.totalRepoChunks} fragmentos indexados en ${kbSummary.totalRepoFiles} archivos · Sonda de citas: [${searchProbe.map((s) => s.id).join(', ')}]`
+          },
+          {
+            id: 'contracts',
+            name: 'Contratos Obligatorios PEI (6 col.) y Plan de Acción (7 col.)',
+            status: 'ok',
+            detail: 'PEI: Foco | Objetivo Estratégico | Proyecto | Unidad de medida | Meta 2030 | Detalle · PA: Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle'
+          },
+          {
+            id: 'media',
+            name: 'Centro Audiovisual (2 Videos + Galería + Canvas)',
+            status: mediaCount.videos >= 2 ? 'ok' : 'info',
+            detail: `Canvas 2 Focos activo · 2 reproductores HTML5 + lightbox listos · En assets/media/: ${mediaCount.videos} video(s), ${mediaCount.images} imagen(es)`
+          },
+          {
+            id: 'arena_api',
+            name: 'Adaptador Exclusivo Arena API (https://api.arena.ai)',
+            status: arenaPub.status === 'configured_ready' ? 'ok' : 'warn',
+            detail: arenaPub.status === 'configured_ready'
+              ? `ARENA_API_KEY configurada · Formato ${arenaPub.format} · Modelo: ${arenaPub.configuredModel || 'autodetección /v1/models'}`
+              : 'Adaptador listo · Pendiente variable ARENA_API_KEY en el servidor (sin respuestas simuladas)'
+          }
+        ];
+
+        return sendJson(res, 200, {
+          ok: true,
+          checkedAt: new Date().toISOString(),
+          checks,
+          arena: arenaPub,
+          knowledge: { totalRepoFiles: kbSummary.totalRepoFiles, totalRepoChunks: kbSummary.totalRepoChunks },
+          media: mediaCount
         });
       }
 

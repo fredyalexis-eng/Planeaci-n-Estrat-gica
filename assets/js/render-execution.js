@@ -6,6 +6,7 @@ import {
   FOCOS,
   SCORING_CRITERIA,
   PEI_FILL_RULES,
+  PA_FILL_RULES,
   REPO_DOCUMENTS,
   AGENT_QUICK_PROMPTS
 } from '../../data/knowledge-base.js';
@@ -17,7 +18,11 @@ import {
   projChecklist,
   projScore,
   projCategory,
-  projHasBaselineIssue
+  projHasBaselineIssue,
+  paValid,
+  paChecklist,
+  paHasBaselineIssue,
+  computeCorrespondence
 } from './state.js';
 import {
   INSTITUTIONAL_VIDEO_SLOTS,
@@ -87,6 +92,13 @@ function renderSafeMediaPlayer(rawUrl, tipo, titulo, meta = {}) {
     </video>
     <div class="media-error-box" hidden>
       <b>Archivo de video no disponible en la ruta indicada</b> (<code>${esc(safeUrl)}</code>). Confirme que el archivo esté en <code>assets/media/</code> con formato <code>.mp4</code> o <code>.webm</code>, o use “Previsualizar archivo local”.
+    </div>
+  </div>
+  <div class="video-controls-bar no-print">
+    <small class="muted">Streaming HTTP 206 activo</small>
+    <div style="display:flex;gap:4px;align-items:center">
+      <small class="muted">Velocidad:</small>
+      ${[0.75, 1, 1.25, 1.5].map((sp) => `<button type="button" class="btn btn-outline btn-xs" style="padding:2px 6px;font-size:11px" onclick="ANI.setVideoRate(this,${sp})">${sp}×</button>`).join('')}
     </div>
   </div>`;
 }
@@ -323,11 +335,25 @@ export function renderPei(state, ui) {
                 }).join('')}
               </div>` : ''}
 
-            <label class="field-label">6. Detalle Técnico (contribución al Foco + criterios F1 / capacidades F2 + supuestos/riesgos) *</label>
+            <label class="field-label">6. Detalle (contribución al Foco + criterios F1 / capacidades F2 + supuestos/riesgos) *</label>
             <textarea placeholder="Explique contribución verificable, criterios transversales o capacidades, supuestos y riesgos." oninput="ANI.setProj('${p.id}','detalle',this.value)">${esc(p.detalle)}</textarea>
 
-            <label class="field-label">Doble Llave F1 ↔ F2 (proyecto o componente complementario obligatorio — R3)</label>
-            <input type="text" value="${esc(p.doble)}" placeholder="Ej.: F1 Corredor X ↔ F2 Sistema preventivo y diálogo territorial Y" oninput="ANI.setProj('${p.id}','doble',this.value)">
+            <div class="grid-2">
+              <div>
+                <label class="field-label">Emparejar con Proyecto Complementario F1 ↔ F2 (Doble Llave R3)</label>
+                <select onchange="ANI.pairDoubleKeyProject('${p.id}',this.value)">
+                  <option value="">Seleccionar contraparte en cartera (opcional)…</option>
+                  ${state.projects
+                    .filter((other) => other.id !== p.id && (!p.foco || !other.foco || other.foco !== p.foco))
+                    .map((other) => `<option value="${other.id}" ${p.dobleProyectoId === other.id ? 'selected' : ''}>[${other.foco || '—'}] ${esc(other.proyecto || 'Proyecto sin nombre')}</option>`)
+                    .join('')}
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Descripción de Doble Llave F1 ↔ F2 (obligatoria — R3)</label>
+                <input type="text" value="${esc(p.doble)}" placeholder="Ej.: F1 Corredor X ↔ F2 Sistema preventivo y diálogo territorial Y" oninput="ANI.setProj('${p.id}','doble',this.value)">
+              </div>
+            </div>
 
             <label class="field-label">Scoring Multicriterio 1–5 (1 = Muy bajo · 5 = Muy alto) — Recomendación R5</label>
             <div class="score-grid">
@@ -399,12 +425,12 @@ export function renderPei(state, ui) {
         <table class="exec-table">
           <thead>
             <tr>
-              <th>1. Foco</th>
-              <th>2. Objetivos Estratégicos</th>
-              <th>3. Proyecto</th>
-              <th>4. Unidad</th>
-              <th>5. Línea Base / Meta 2030</th>
-              <th>6. Detalle y Doble Llave</th>
+              <th>Foco</th>
+              <th>Objetivo Estratégico</th>
+              <th>Proyecto</th>
+              <th>Unidad de medida</th>
+              <th>Meta 2030</th>
+              <th>Detalle</th>
               <th>Priorización y Validez</th>
               <th class="no-print">Acciones</th>
             </tr>
@@ -518,19 +544,34 @@ export function renderActionPlan(state, paUi = {}) {
   const items = state.actionPlan.filter((a) =>
     (!filterFoco || a.foco === filterFoco) &&
     (!filterEstado || a.estado === filterEstado) &&
-    (!q || `${a.codigo} ${a.actividad} ${a.entregable} ${a.proyectoNombre} ${a.responsable} ${a.indicador}`.toLowerCase().includes(q))
+    (!q || `${a.codigo} ${a.objetivo} ${a.proyectoNombre} ${a.actividad} ${a.m2027} ${a.unidad} ${a.detalle} ${a.entregable} ${a.responsable} ${a.indicador}`.toLowerCase().includes(q))
   );
 
   const avgProgress = items.length
     ? Math.round(items.reduce((s, a) => s + (Number(a.avance) || 0), 0) / items.length)
     : 0;
-  const coveredProjectIds = new Set(state.actionPlan.map((a) => a.proyectoId).filter(Boolean));
+  const validPaCount = items.filter((a) => paValid(a) && !paHasBaselineIssue(a)).length;
+  const corr = computeCorrespondence(state);
   const estadosList = ['Formulada', 'Propuesta IA — No aprobada', 'Programada', 'En ejecución', 'En alerta', 'Cumplida'];
 
+  const objDatalist = state.identity.objetivos.length
+    ? `<datalist id="pa-objetivos-list">${state.identity.objetivos.map((o) => `<option value="${esc(`${o.codigo ? o.codigo + ' · ' : ''}${o.nombre}`)}"></option>`).join('')}</datalist>`
+    : '';
+
   const tabs = [
-    ['fichas', `Actividades y Seguimiento (${state.actionPlan.length})`],
-    ['cronograma', 'Cronograma Plurianual 2027–2030']
+    ['fichas', `Fichas Editables (${state.actionPlan.length})`],
+    ['tabla', 'Tabla Plan de Acción (7 columnas)'],
+    ['cronograma', 'Cronograma Plurianual 2027–2030'],
+    ['correspondencia', `Correspondencia PEI ↔ PA (${corr.coveredProjects}/${state.projects.length})`]
   ];
+
+  const actionButtons = `
+    <div class="toolbar no-print" style="margin:0">
+      <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Nueva actividad</button>
+      <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV PA <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)"></label>
+      <button class="btn btn-navy btn-sm" onclick="ANI.exportActionCsv()">Exportar CSV PA</button>
+      <button class="btn btn-outline btn-sm" onclick="ANI.exportActionTemplateCsv()">Plantilla 7 col.</button>
+    </div>`;
 
   const filterBar = `
     <div class="toolbar no-print" style="margin-bottom:10px">
@@ -543,113 +584,227 @@ export function renderActionPlan(state, paUi = {}) {
         <option value="" ${!filterEstado ? 'selected' : ''}>Todos los estados</option>
         ${estadosList.map((st) => `<option value="${esc(st)}" ${filterEstado === st ? 'selected' : ''}>${esc(st)}</option>`).join('')}
       </select>
-      <input type="search" value="${esc(searchPa)}" placeholder="Buscar actividad, proyecto PEI, entregable o responsable…" style="flex:1;min-width:190px" oninput="ANI.setPaSearch(this.value)">
+      <input type="search" value="${esc(searchPa)}" placeholder="Buscar por objetivo, proyecto, actividad, meta 2027, detalle o responsable…" style="flex:1;min-width:190px" oninput="ANI.setPaSearch(this.value)">
     </div>
     <div class="table-summary-bar">
       <span>Actividades: <b>${items.length}</b> de ${state.actionPlan.length}</span>
+      <span>· Filas válidas (7 col. + R6): <b>${validPaCount}/${items.length}</b></span>
       <span>· Avance promedio: <b>${avgProgress}%</b></span>
-      <span>· Cobertura Cartera PEI: <b>${coveredProjectIds.size}/${state.projects.length}</b> proyectos con PA</span>
+      <span>· Cobertura Cartera PEI: <b>${corr.coveredProjects}/${state.projects.length}</b> proyectos con PA</span>
     </div>`;
 
   let body = '';
   if (paTab === 'fichas') {
     body = `
+    ${objDatalist}
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Despliegue Operativo: Cartera PEI → Plan de Acción 2027–2030</h2>
-          <p class="muted">Programe actividades concretas, entregables, indicadores de gestión, metas anuales, responsables y recursos (sin inventar cifras sin soporte).</p>
+          <h2>Despliegue Operativo: Cartera PEI → Plan de Acción</h2>
+          <p class="muted">Estructura contractual obligatoria: <b>Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle</b>, articulada con el cronograma 2027–2030.</p>
         </div>
-        <div class="toolbar no-print" style="margin:0">
-          <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Nueva actividad</button>
-          <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV PA <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)"></label>
-          <button class="btn btn-outline btn-sm" onclick="ANI.exportActionCsv()">Exportar CSV PA</button>
-        </div>
+        ${actionButtons}
       </div>
 
       ${filterBar}
 
+      <details class="guide-box" style="margin-bottom:12px">
+        <summary>Reglas contractuales de llenado — Plan de Acción (7 columnas obligatorias) ${citeBadge('MARCO-S3.7')}</summary>
+        <div class="table-wrap" style="margin-top:8px">
+          <table class="exec-table">
+            <thead><tr><th>Columna obligatoria</th><th>Regla de trazabilidad</th><th>Error típico a evitar</th></tr></thead>
+            <tbody>${PA_FILL_RULES.map((r) => `<tr><td><b>${esc(r.col)}</b></td><td>${esc(r.rule)}</td><td>${esc(r.avoid)}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </details>
+
       ${items.length
-        ? items.map((a, idx) => `
-          <div class="entity-card" data-pa-card="${a.id}">
+        ? items.map((a, idx) => {
+            const ok = paValid(a) && !paHasBaselineIssue(a);
+            const r6 = paHasBaselineIssue(a);
+            const checks = paChecklist(a, state.projects);
+            return `
+          <article class="entity-card" data-pa-card="${a.id}">
             <div class="entity-head">
               <span class="badge badge-navy">${esc(a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`)}</span>
               <span class="badge ${a.foco === 'F2' ? 'badge-amber' : a.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${a.foco || 'Sin foco'}</span>
               <span class="entity-title" data-pa-title="${a.id}">${esc(a.actividad || 'Actividad en formulación')}</span>
+              <span class="badge ${ok ? 'badge-ok' : 'badge-warn'}" data-pa-valid="${a.id}">${ok ? 'Fila válida (7 col.)' : 'Incompleta / revisar'}</span>
               ${statusBadge(a.estatus)}
               <span style="flex:1"></span>
               <button class="btn btn-outline btn-xs no-print" onclick="ANI.dupActionItem('${a.id}')">Duplicar</button>
               <button class="btn btn-danger btn-xs no-print" onclick="ANI.delActionItem('${a.id}')">Eliminar</button>
             </div>
+
+            <div class="callout callout-bad" data-pa-r6="${a.id}" style="padding:8px 12px;font-size:12px;${r6 ? '' : 'display:none'}">
+              <b>Alerta R6:</b> Registró una Meta 2027 numérica sin línea base verificada. Registre la línea base oficial o escriba <i>"Por definir — línea base pendiente"</i>.
+            </div>
+
             <div class="grid-3">
               <div>
-                <label class="field-label">Proyecto PEI asociado *</label>
+                <label class="field-label">1. Foco *</label>
+                <select onchange="ANI.setAction('${a.id}','foco',this.value,true)">
+                  <option value="" ${!a.foco ? 'selected' : ''}>Seleccionar foco único…</option>
+                  <option value="F1" ${a.foco === 'F1' ? 'selected' : ''}>F1 · Infraestructura dinamizadora</option>
+                  <option value="F2" ${a.foco === 'F2' ? 'selected' : ''}>F2 · Ruta social y prevención</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">3. Proyecto (vincular desde Cartera PEI) *</label>
                 <select onchange="ANI.linkActionProject('${a.id}',this.value)">
-                  <option value="">Seleccionar proyecto PEI…</option>
+                  <option value="">Seleccionar proyecto PEI (hereda Foco y Objetivo)…</option>
                   ${state.projects.map((p) => `<option value="${p.id}" ${a.proyectoId === p.id ? 'selected' : ''}>[${p.foco || '—'}] ${esc(p.proyecto || 'Sin nombre')}</option>`).join('')}
                 </select>
               </div>
               <div>
-                <label class="field-label">Foco Estratégico *</label>
-                <select onchange="ANI.setAction('${a.id}','foco',this.value,true)">
-                  <option value="" ${!a.foco ? 'selected' : ''}>Seleccionar…</option>
-                  <option value="F1" ${a.foco === 'F1' ? 'selected' : ''}>F1 · Infraestructura dinamizadora</option>
-                  <option value="F2" ${a.foco === 'F2' ? 'selected' : ''}>F2 · Ruta social preventiva</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Dependencia / Rol Responsable *</label>
-                <input type="text" value="${esc(a.responsable)}" placeholder="Ej.: Planeación, Gestión Social, Jurídica, Predial…" oninput="ANI.setAction('${a.id}','responsable',this.value)">
+                <label class="field-label">3b. Nombre del Proyecto *</label>
+                <input type="text" value="${esc(a.proyectoNombre)}" placeholder="Proyecto estratégico PEI al que corresponde" oninput="ANI.setAction('${a.id}','proyectoNombre',this.value)">
               </div>
             </div>
+
             <div class="grid-2">
-              <div><label class="field-label">Actividad del Plan de Acción *</label><input type="text" value="${esc(a.actividad)}" placeholder="Acción concreta y verificable" oninput="ANI.setAction('${a.id}','actividad',this.value)"></div>
-              <div><label class="field-label">Producto / Entregable verificable *</label><input type="text" value="${esc(a.entregable)}" placeholder="Protocolo, estudio, km intervenidos, sistema…" oninput="ANI.setAction('${a.id}','entregable',this.value)"></div>
-            </div>
-            <div class="grid-3">
-              <div><label class="field-label">Indicador de gestión</label><input type="text" value="${esc(a.indicador)}" placeholder="Fórmula o nombre del indicador" oninput="ANI.setAction('${a.id}','indicador',this.value)"></div>
-              <div><label class="field-label">Unidad de medida</label><input type="text" value="${esc(a.unidad)}" placeholder="%, documentos, mesas, km…" oninput="ANI.setAction('${a.id}','unidad',this.value)"></div>
-              <div><label class="field-label">Presupuesto / fuente de recursos</label><input type="text" value="${esc(a.presupuesto)}" placeholder="Por definir — restricción presupuestal pendiente" oninput="ANI.setAction('${a.id}','presupuesto',this.value)"></div>
-            </div>
-            <div class="grid-4">
-              <div><label class="field-label">Programación 2027</label><input type="text" value="${esc(a.m2027)}" placeholder="Hito / meta 2027" oninput="ANI.setAction('${a.id}','m2027',this.value)"></div>
-              <div><label class="field-label">Programación 2028</label><input type="text" value="${esc(a.m2028)}" placeholder="Hito / meta 2028" oninput="ANI.setAction('${a.id}','m2028',this.value)"></div>
-              <div><label class="field-label">Programación 2029</label><input type="text" value="${esc(a.m2029)}" placeholder="Hito / meta 2029" oninput="ANI.setAction('${a.id}','m2029',this.value)"></div>
-              <div><label class="field-label">Programación 2030</label><input type="text" value="${esc(a.m2030)}" placeholder="Hito / meta 2030" oninput="ANI.setAction('${a.id}','m2030',this.value)"></div>
-            </div>
-            <div class="grid-3">
               <div>
-                <label class="field-label">Estado operativo</label>
-                <select onchange="ANI.setAction('${a.id}','estado',this.value)">
-                  ${estadosList.map((st) => `<option value="${st}" ${a.estado === st ? 'selected' : ''}>${st}</option>`).join('')}
-                </select>
+                <label class="field-label">2. Objetivo Estratégico *</label>
+                <input type="text" list="pa-objetivos-list" value="${esc(a.objetivo)}" placeholder="Heredado del Proyecto PEI o: Información insuficiente para concluir" oninput="ANI.setAction('${a.id}','objetivo',this.value)">
               </div>
               <div>
-                <label class="field-label">Avance físico (<span id="pa-av-${a.id}">${a.avance}</span>%)</label>
-                <input type="range" min="0" max="100" step="5" value="${a.avance}" oninput="ANI.setAction('${a.id}','avance',this.value)">
+                <label class="field-label">4. Actividad *</label>
+                <input type="text" value="${esc(a.actividad)}" placeholder="Acción operativa concreta y verificable" oninput="ANI.setAction('${a.id}','actividad',this.value)">
               </div>
-              <div><label class="field-label">Riesgo operativo y mitigación</label><input type="text" value="${esc(a.riesgo)}" placeholder="Riesgo asociado y acción preventiva" oninput="ANI.setAction('${a.id}','riesgo',this.value)"></div>
             </div>
-          </div>`).join('')
+
+            <div class="grid-3">
+              <div>
+                <label class="field-label">Línea Base (control R6)</label>
+                <input type="text" value="${esc(a.lineaBase)}" placeholder="Dato oficial o: Información insuficiente para concluir" oninput="ANI.setAction('${a.id}','lineaBase',this.value)">
+              </div>
+              <div>
+                <label class="field-label">5. Meta 2027 *</label>
+                <input type="text" value="${esc(a.m2027)}" placeholder="Por definir — línea base pendiente" oninput="ANI.setAction('${a.id}','m2027',this.value)">
+              </div>
+              <div>
+                <label class="field-label">6. Unidad de medida *</label>
+                <input type="text" value="${esc(a.unidad)}" placeholder="Una sola unidad: documentos, km, %, casos, mesas…" oninput="ANI.setAction('${a.id}','unidad',this.value)">
+              </div>
+            </div>
+
+            <label class="field-label">7. Detalle (alcance operativo, entregable, articulación F1↔F2, supuestos y verificación) *</label>
+            <textarea style="min-height:68px" placeholder="Describa alcance verificable, contribución al Proyecto PEI, articulación F1↔F2, supuestos y riesgos." oninput="ANI.setAction('${a.id}','detalle',this.value)">${esc(a.detalle)}</textarea>
+
+            <details class="guide-box" style="margin-top:10px" ${a.m2028 || a.m2029 || a.m2030 || a.responsable || a.entregable ? 'open' : ''}>
+              <summary>Programación plurianual 2028–2030, responsable, indicador, recursos y seguimiento</summary>
+              <div class="grid-3" style="margin-top:8px">
+                <div><label class="field-label" style="margin-top:0">Producto / Entregable verificable</label><input type="text" value="${esc(a.entregable)}" placeholder="Protocolo, estudio, km intervenidos, sistema…" oninput="ANI.setAction('${a.id}','entregable',this.value)"></div>
+                <div><label class="field-label" style="margin-top:0">Indicador de gestión</label><input type="text" value="${esc(a.indicador)}" placeholder="Fórmula o nombre del indicador" oninput="ANI.setAction('${a.id}','indicador',this.value)"></div>
+                <div><label class="field-label" style="margin-top:0">Dependencia / Rol Responsable</label><input type="text" value="${esc(a.responsable)}" placeholder="Planeación, Gestión Social, Jurídica, Predial…" oninput="ANI.setAction('${a.id}','responsable',this.value)"></div>
+              </div>
+              <div class="grid-4">
+                <div><label class="field-label">Proyección 2028</label><input type="text" value="${esc(a.m2028)}" placeholder="Hito / meta 2028" oninput="ANI.setAction('${a.id}','m2028',this.value)"></div>
+                <div><label class="field-label">Proyección 2029</label><input type="text" value="${esc(a.m2029)}" placeholder="Hito / meta 2029" oninput="ANI.setAction('${a.id}','m2029',this.value)"></div>
+                <div><label class="field-label">Proyección 2030</label><input type="text" value="${esc(a.m2030)}" placeholder="Hito / meta 2030" oninput="ANI.setAction('${a.id}','m2030',this.value)"></div>
+                <div><label class="field-label">Presupuesto / fuente</label><input type="text" value="${esc(a.presupuesto)}" placeholder="Por definir — restricción presupuestal pendiente" oninput="ANI.setAction('${a.id}','presupuesto',this.value)"></div>
+              </div>
+              <div class="grid-4">
+                <div>
+                  <label class="field-label">Estado operativo</label>
+                  <select onchange="ANI.setAction('${a.id}','estado',this.value)">
+                    ${estadosList.map((st) => `<option value="${st}" ${a.estado === st ? 'selected' : ''}>${st}</option>`).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Estatus de gobernanza</label>
+                  <select onchange="ANI.setAction('${a.id}','estatus',this.value,true)">
+                    <option value="en_construccion" ${a.estatus === 'en_construccion' ? 'selected' : ''}>En construcción (Equipo)</option>
+                    <option value="validado_taller" ${a.estatus === 'validado_taller' ? 'selected' : ''}>Validado en taller</option>
+                    <option value="propuesta_ia" ${a.estatus === 'propuesta_ia' ? 'selected' : ''}>Propuesta IA — No aprobada</option>
+                    <option value="oficial_ani" ${a.estatus === 'oficial_ani' ? 'selected' : ''}>Oficial ANI (Aprobado)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Avance físico (<span id="pa-av-${a.id}">${a.avance}</span>%)</label>
+                  <input type="range" min="0" max="100" step="5" value="${a.avance}" oninput="ANI.setAction('${a.id}','avance',this.value)">
+                </div>
+                <div><label class="field-label">Riesgo operativo y mitigación</label><input type="text" value="${esc(a.riesgo)}" placeholder="Riesgo asociado y acción preventiva" oninput="ANI.setAction('${a.id}','riesgo',this.value)"></div>
+              </div>
+            </details>
+
+            <div class="tag-cloud" style="margin-top:10px" data-pa-checks="${a.id}">
+              ${checks.map(([lbl, cOk]) => `<span class="badge ${cOk ? 'badge-ok' : 'badge-warn'}">${cOk ? '✓' : '○'} ${esc(lbl)}</span>`).join('')}
+            </div>
+          </article>`;
+          }).join('')
         : `<div class="empty-state">
-            <h3>${state.actionPlan.length ? 'Ninguna actividad coincide con el filtro actual' : 'Plan de Acción 2027–2030 listo para programación'}</h3>
-            <p class="muted">Cree actividades directamente, impórtelas desde CSV o derívelas desde cada proyecto de la Cartera PEI (botón “+ Actividad PA”).</p>
-            <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Crear primera actividad</button>
+            <h3>${state.actionPlan.length ? 'Ninguna actividad coincide con el filtro actual' : 'Plan de Acción listo para programación'}</h3>
+            <p class="muted">Cree actividades cumpliendo las 7 columnas obligatorias, impórtelas desde CSV o derívelas en 1 clic desde cada proyecto de la Cartera PEI (“+ Actividad PA”).</p>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px">
+              <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Crear primera actividad</button>
+              ${state.projects.length ? `<button class="btn btn-outline btn-sm" onclick="ANI.setPaTab('correspondencia')">Derivar desde Cartera PEI (${state.projects.length}) →</button>` : ''}
+            </div>
           </div>`}
     </div>`;
-  } else {
+  } else if (paTab === 'tabla') {
+    body = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Contrato de Trazabilidad — Tabla Plan de Acción (7 Columnas Obligatorias)</h2>
+          <p class="muted">Estructura oficial: <b>Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle</b>.</p>
+        </div>
+        ${actionButtons}
+      </div>
+      ${filterBar}
+      <div class="table-wrap">
+        <table class="exec-table">
+          <thead>
+            <tr>
+              <th>Foco</th>
+              <th>Objetivo Estratégico</th>
+              <th>Proyecto</th>
+              <th>Actividad</th>
+              <th>Meta 2027</th>
+              <th>Unidad de medida</th>
+              <th>Detalle</th>
+              <th>Validez y Estado</th>
+              <th class="no-print">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.length
+              ? items.map((a) => {
+                  const ok = paValid(a) && !paHasBaselineIssue(a);
+                  const r6 = paHasBaselineIssue(a);
+                  return `<tr>
+                    <td><span class="badge ${a.foco === 'F2' ? 'badge-amber' : a.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${a.foco || '—'}</span></td>
+                    <td>${esc(a.objetivo || 'Pendiente')}</td>
+                    <td><b>${esc(a.proyectoNombre || 'Sin proyecto PEI')}</b>${a.proyectoId ? `<br><span class="badge badge-ok">Vinculado PEI</span>` : `<br><span class="badge badge-warn">Por vincular</span>`}</td>
+                    <td><b>${esc(a.actividad || 'Sin nombre')}</b><br>${statusBadge(a.estatus)}</td>
+                    <td><b>${esc(a.m2027 || 'Por definir')}</b><br><small class="muted">LB: ${esc(a.lineaBase || 'Pendiente')}</small>${r6 ? `<br><span class="badge badge-bad">Alerta R6</span>` : ''}</td>
+                    <td>${esc(a.unidad || '—')}</td>
+                    <td style="max-width:260px">${esc(a.detalle || '—')}${a.responsable ? `<br><small class="muted"><b>Resp.:</b> ${esc(a.responsable)}</small>` : ''}</td>
+                    <td>
+                      <span class="badge ${ok ? 'badge-ok' : 'badge-warn'}">${ok ? '✓ Válida' : '○ Revisar'}</span><br>
+                      <small class="muted">${esc(a.estado)} · ${a.avance}%</small>
+                    </td>
+                    <td class="no-print" style="white-space:nowrap">
+                      <button class="btn btn-outline btn-xs" onclick="ANI.focusAction('${a.id}')">Editar</button>
+                      <button class="btn btn-danger btn-xs" onclick="ANI.delActionItem('${a.id}')">✕</button>
+                    </td>
+                  </tr>`;
+                }).join('')
+              : `<tr><td colspan="9" class="muted">${state.actionPlan.length ? 'Ninguna actividad coincide con el filtro actual.' : 'Sin actividades en la Tabla del Plan de Acción. Use “+ Nueva actividad” o importe un CSV.'}</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  } else if (paTab === 'cronograma') {
     body = `
     <div class="card">
       <div class="card-header">
         <div>
           <h2>Cronograma Plurianual del Plan de Acción (2027–2030)</h2>
-          <p class="muted">Seguimiento consolidado por horizonte anual, responsable, entregable, indicador y avance físico.</p>
+          <p class="muted">Seguimiento consolidado por horizonte anual (Meta 2027 a 2030), responsable, indicador y avance físico.</p>
         </div>
-        <div class="toolbar no-print" style="margin:0">
-          <button class="btn btn-teal btn-sm" onclick="ANI.addActionItem()">+ Actividad</button>
-          <label class="btn btn-outline btn-sm" style="cursor:pointer">Importar CSV PA <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)"></label>
-          <button class="btn btn-navy btn-sm" onclick="ANI.exportActionCsv()">Exportar CSV PA</button>
-        </div>
+        ${actionButtons}
       </div>
       ${filterBar}
       <div class="table-wrap">
@@ -658,8 +813,8 @@ export function renderActionPlan(state, paUi = {}) {
             <tr>
               <th>Código / Foco</th>
               <th>Proyecto PEI → Actividad</th>
-              <th>Indicador y Responsable</th>
-              <th>2027 (Corto)</th>
+              <th>Objetivo, Indicador y Responsable</th>
+              <th>Meta 2027 (Corto)</th>
               <th>2028 (Mediano)</th>
               <th>2029 (Mediano)</th>
               <th>2030 (Largo)</th>
@@ -671,15 +826,16 @@ export function renderActionPlan(state, paUi = {}) {
             ${items.length
               ? items.map((a, idx) => `<tr>
                   <td><b>${esc(a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`)}</b><br><span class="badge ${a.foco === 'F2' ? 'badge-amber' : a.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${a.foco || '—'}</span></td>
-                  <td><small class="muted">${esc(a.proyectoNombre || 'Sin proyecto PEI')}</small><br><b>${esc(a.actividad || 'Sin nombre')}</b><br><small class="muted">Entregable: ${esc(a.entregable || '—')}</small><br>${statusBadge(a.estatus)}</td>
-                  <td>${esc(a.indicador || '—')}${a.unidad ? ` <small class="muted">(${esc(a.unidad)})</small>` : ''}<br><small class="muted"><b>Resp.:</b> ${esc(a.responsable || 'Por asignar')}</small></td>
-                  <td>${esc(a.m2027 || '—')}</td>
+                  <td><small class="muted">${esc(a.proyectoNombre || 'Sin proyecto PEI')}</small><br><b>${esc(a.actividad || 'Sin nombre')}</b><br><small class="muted">${esc(a.unidad || 'Sin unidad')}${a.entregable ? ` · ${esc(a.entregable)}` : ''}</small><br>${statusBadge(a.estatus)}</td>
+                  <td><small class="muted"><b>OE:</b> ${esc(a.objetivo || 'Pendiente')}</small><br>${esc(a.indicador || '—')}<br><small class="muted"><b>Resp.:</b> ${esc(a.responsable || 'Por asignar')}</small></td>
+                  <td><b>${esc(a.m2027 || '—')}</b></td>
                   <td>${esc(a.m2028 || '—')}</td>
                   <td>${esc(a.m2029 || '—')}</td>
                   <td>${esc(a.m2030 || '—')}</td>
                   <td>
-                    <span class="badge ${a.estado === 'Cumplida' ? 'badge-ok' : a.estado === 'En alerta' ? 'badge-bad' : 'badge-slate'}">${esc(a.estado)}</span><br>
-                    <small class="muted">Avance: <b>${a.avance}%</b></small>
+                    <span class="badge ${a.estado === 'Cumplida' ? 'badge-ok' : a.estado === 'En alerta' ? 'badge-bad' : 'badge-slate'}">${esc(a.estado)}</span>
+                    <div class="mini-bar" style="margin:5px 0 3px"><i style="width:${a.avance}%"></i></div>
+                    <small class="muted"><b>${a.avance}%</b></small>
                   </td>
                   <td class="no-print" style="white-space:nowrap">
                     <button class="btn btn-outline btn-xs" onclick="ANI.focusAction('${a.id}')">Editar</button>
@@ -690,6 +846,75 @@ export function renderActionPlan(state, paUi = {}) {
           </tbody>
         </table>
       </div>
+    </div>`;
+  } else {
+    body = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Matriz de Correspondencia PEI 2027–2030 ↔ Plan de Acción y Doble Llave F1↔F2</h2>
+          <p class="muted">Verifica que cada Proyecto PEI cuente con su contraparte de Doble Llave (F1↔F2) y su despliegue operativo en el Plan de Acción (Meta 2027).</p>
+        </div>
+        <button class="btn btn-soft btn-sm no-print" onclick="ANI.syncAllPaFromPei()">↻ Sincronizar Foco y Objetivos PEI → PA</button>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:14px">
+        <div class="kpi-card kpi-accent-navy"><span class="kpi-label">Cobertura PEI → PA</span><span class="kpi-value">${corr.coveragePct}%</span><span class="kpi-sub">${corr.coveredProjects} de ${state.projects.length} proyectos con PA</span></div>
+        <div class="kpi-card kpi-accent-teal"><span class="kpi-label">Doble Llave F1 ↔ F2</span><span class="kpi-value">${corr.doubleKeyPct}%</span><span class="kpi-sub">${corr.doubleKeyProjects} de ${state.projects.length} con contraparte</span></div>
+        <div class="kpi-card kpi-accent-amber"><span class="kpi-label">PA sin Proyecto PEI</span><span class="kpi-value">${corr.orphanActions.length}</span><span class="kpi-sub">${corr.orphanActions.length ? 'Requieren vinculación' : 'Correspondencia limpia'}</span></div>
+        <div class="kpi-card kpi-accent-navy"><span class="kpi-label">Alertas de Foco</span><span class="kpi-value">${corr.focoMismatches.length}</span><span class="kpi-sub">${corr.focoMismatches.length ? 'Foco PA ≠ Foco PEI' : 'Focos 100% coherentes'}</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="exec-table">
+          <thead>
+            <tr>
+              <th>Foco</th>
+              <th>Proyecto PEI y Objetivo Estratégico</th>
+              <th>Meta 2030 (PEI)</th>
+              <th>Articulación Doble Llave (F1 ↔ F2)</th>
+              <th>Actividades Plan de Acción (Meta 2027 · Unidad)</th>
+              <th class="no-print">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${corr.projectRows.length
+              ? corr.projectRows.map((row) => {
+                  const p = row.project;
+                  return `<tr>
+                    <td><span class="badge ${p.foco === 'F2' ? 'badge-amber' : p.foco === 'F1' ? 'badge-teal' : 'badge-warn'}">${p.foco || '—'}</span></td>
+                    <td><b>${esc(p.proyecto || 'Sin nombre')}</b><br><small class="muted"><b>OE:</b> ${esc(p.objetivo || 'Pendiente')}</small></td>
+                    <td><b>${esc(p.meta || 'Por definir')}</b><br><small class="muted">${esc(p.unidad || '—')}</small></td>
+                    <td>${row.hasDoubleKey
+                      ? `<span class="badge badge-ok">✓ Declarada</span><br><small class="muted">${esc(row.partner ? `[${row.partner.foco}] ${row.partner.proyecto}` : p.doble)}</small>`
+                      : `<span class="badge badge-warn">○ Pendiente R3</span>`}</td>
+                    <td>${row.linkedActions.length
+                      ? row.linkedActions.map((a) => `<div style="margin-bottom:5px">
+                          <span class="badge ${paValid(a) ? 'badge-ok' : 'badge-warn'}">${paValid(a) ? '✓' : '○'}</span>
+                          <b>${esc(a.actividad || 'Sin nombre')}</b>
+                          <small class="muted">· Meta 2027: <b>${esc(a.m2027 || 'Por definir')}</b> (${esc(a.unidad || '—')}) · ${a.avance}%</small>
+                        </div>`).join('')
+                      : `<span class="badge badge-warn">Sin actividades en Plan de Acción</span>`}</td>
+                    <td class="no-print" style="white-space:nowrap">
+                      <button class="btn btn-teal btn-xs" onclick="ANI.addActionForProject('${p.id}')">+ Actividad PA</button>
+                    </td>
+                  </tr>`;
+                }).join('')
+              : `<tr><td colspan="6" class="muted">Registre proyectos en la Cartera PEI (Módulo 06) para visualizar y gestionar su correspondencia con el Plan de Acción.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      ${corr.orphanActions.length ? `
+        <h3 style="margin-top:16px">Actividades del Plan de Acción pendientes de vincular a un Proyecto PEI (${corr.orphanActions.length})</h3>
+        ${corr.orphanActions.map((a) => `
+          <div class="callout callout-warn" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <span><b>[${esc(a.foco || '—')}] ${esc(a.actividad || 'Actividad sin nombre')}</b> · Meta 2027: ${esc(a.m2027 || 'Por definir')}</span>
+            <select style="width:auto;min-width:240px" onchange="ANI.linkActionProject('${a.id}',this.value)" class="no-print">
+              <option value="">Vincular a proyecto PEI…</option>
+              ${state.projects.map((p) => `<option value="${p.id}">[${p.foco || '—'}] ${esc(p.proyecto || 'Sin nombre')}</option>`).join('')}
+            </select>
+          </div>`).join('')}` : ''}
     </div>`;
   }
 
@@ -978,9 +1203,12 @@ export function renderMedia(state, mediaUi = {}) {
         <h2>Canvas Ejecutivo Original Preservado — 2 Focos ANI 2027–2030</h2>
         <p class="muted">Recurso gráfico interactivo existente en el repositorio (<code>03_Canvas_2_Focos_ANI.html</code>), integrado sin alteraciones.</p>
       </div>
-      <a class="btn btn-navy btn-sm no-print" href="./03_Canvas_2_Focos_ANI.html" target="_blank" rel="noopener">Abrir pantalla completa ↗</a>
+      <div class="toolbar no-print" style="margin:0">
+        <button type="button" class="btn btn-outline btn-sm" onclick="ANI.toggleCanvasHeight()">Alternar alto</button>
+        <a class="btn btn-navy btn-sm" href="./03_Canvas_2_Focos_ANI.html" target="_blank" rel="noopener">Abrir pantalla completa ↗</a>
+      </div>
     </div>
-    <iframe class="media-frame" src="./03_Canvas_2_Focos_ANI.html" title="Canvas Ejecutivo 2 Focos ANI 2027-2030"></iframe>
+    <iframe id="aniCanvasFrame" class="media-frame" src="./03_Canvas_2_Focos_ANI.html" title="Canvas Ejecutivo 2 Focos ANI 2027-2030"></iframe>
   </div>`;
 
   const downloadsSection = `
@@ -1053,11 +1281,12 @@ export function renderChatFeedHtml(messages) {
       return `
       <div class="proposal-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
-          <span class="badge badge-ai">Propuesta Plan de Acción — No aprobada</span>
+          <span class="badge badge-ai">Propuesta Plan de Acción — Borrador no aprobado</span>
           <span class="badge ${a.foco === 'F2' ? 'badge-amber' : 'badge-teal'}">${esc(a.foco)}</span>
         </div>
         <b style="display:block;margin:6px 0 3px;color:var(--navy-900)">${esc(a.actividad)}</b>
-        <div class="muted">Proyecto PEI: ${esc(a.proyectoNombre || 'Por vincular')} · Entregable: ${esc(a.entregable)} · Indicador: ${esc(a.indicador)} · Responsable: ${esc(a.responsable)}</div>
+        <div class="muted"><b>Objetivo:</b> ${esc(a.objetivo || 'Por definir')} · <b>Proyecto:</b> ${esc(a.proyectoNombre || 'Por vincular')} · <b>Meta 2027:</b> ${esc(a.m2027 || 'Por definir')} · <b>Unidad:</b> ${esc(a.unidad || '—')}</div>
+        <p class="muted" style="margin:4px 0">${esc(a.detalle || a.entregable || '')}</p>
         ${done
           ? `<span class="badge badge-ok" style="margin-top:6px">✓ Incorporado como borrador en Plan de Acción</span>`
           : `<button class="btn btn-navy btn-xs no-print" style="margin-top:6px" onclick="ANI.acceptProposal(${mIdx},'pa',${aIdx})">+ Incorporar como borrador al Plan de Acción</button>`}
@@ -1139,7 +1368,8 @@ export function renderAgentModule(state, agentUi) {
     busy = false,
     searchQuery = '',
     searchResults = null,
-    auditReport = null
+    auditReport = null,
+    diagnostics = null
   } = agentUi;
 
   const arena = statusData?.arena || {};
@@ -1161,7 +1391,8 @@ export function renderAgentModule(state, agentUi) {
   const tabs = [
     ['chat', 'Agente Estratégico ANI (Arena API)'],
     ['buscador', 'Buscador Documental BM25'],
-    ['auditor', 'Auditor de Trazabilidad R1–R6']
+    ['auditor', 'Auditor PEI ↔ PA y R1–R6'],
+    ['diagnostico', 'Diagnóstico Técnico']
   ];
 
   let body = '';
@@ -1259,13 +1490,13 @@ export function renderAgentModule(state, agentUi) {
           : `<p class="muted">No se encontraron fragmentos para “${esc(searchQuery)}”.</p>`
         : `<p class="muted">Ingrese un término estratégico para recuperar los pasajes literales y su ubicación exacta.</p>`}
     </div>`;
-  } else {
+  } else if (toolTab === 'auditor') {
     body = `
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Auditor Institucional de Trazabilidad (Reglas R1–R6 y Checklist PEI)</h2>
-          <p class="muted">Verifica automáticamente completitud de 6 columnas, coherencia línea base–meta 2030, doble llave F1↔F2, riesgo de competencia R2, 7 Ejes PND y vínculo con Plan de Acción.</p>
+          <h2>Auditor Institucional de Trazabilidad (PEI 6 col. · Plan de Acción 7 col. · R1–R6)</h2>
+          <p class="muted">Verifica completitud de las 6 columnas PEI y 7 columnas Plan de Acción, coherencia línea base–metas (R6), doble llave F1↔F2 (R3), competencia R2, 7 Ejes PND y correspondencia PEI ↔ PA.</p>
         </div>
         <button class="btn btn-teal btn-sm" onclick="ANI.executeAudit()">Ejecutar auditoría ahora</button>
       </div>
@@ -1285,6 +1516,35 @@ export function renderAgentModule(state, agentUi) {
               <div style="margin-top:4px">${esc(f.detail)}</div>
             </div>`).join('')}`
         : `<p class="muted">Pulse “Ejecutar auditoría ahora” para evaluar su estado actual de planeación.</p>`}
+    </div>`;
+  } else {
+    const checks = Array.isArray(diagnostics?.checks) ? diagnostics.checks : [];
+    body = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Diagnóstico Técnico Integral del Sistema y Agente Estratégico</h2>
+          <p class="muted">Comprobación en tiempo real del servidor API, seguridad, motor documental BM25, estructuras obligatorias PEI/PA, Centro Audiovisual y conexión Arena API.</p>
+        </div>
+        <div class="toolbar no-print" style="margin:0">
+          <button class="btn btn-teal btn-sm" onclick="ANI.runDiagnostics()">↻ Ejecutar diagnóstico</button>
+          <button class="btn btn-outline btn-sm" onclick="ANI.verifyArena()">Probar Arena API (/v1/models)</button>
+        </div>
+      </div>
+      ${checks.length
+        ? `<div class="diag-grid">
+            ${checks.map((ck) => `<div class="diag-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+                <b style="color:var(--navy-900);font-size:13.2px">${esc(ck.name)}</b>
+                <span class="badge ${ck.status === 'ok' ? 'badge-ok' : ck.status === 'bad' ? 'badge-bad' : ck.status === 'info' ? 'badge-navy' : 'badge-warn'}">
+                  ${ck.status === 'ok' ? 'Operativo' : ck.status === 'bad' ? 'Error' : ck.status === 'info' ? 'Preparado' : 'Requiere clave'}
+                </span>
+              </div>
+              <p class="muted" style="margin:0;font-size:12.2px">${esc(ck.detail)}</p>
+            </div>`).join('')}
+          </div>
+          <p class="muted" style="margin-top:10px;font-size:11.5px">Última comprobación: <code>${esc(diagnostics.checkedAt || '')}</code></p>`
+        : `<p class="muted">Pulse “Ejecutar diagnóstico” para comprobar todos los subsistemas en tiempo real.</p>`}
     </div>`;
   }
 

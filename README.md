@@ -15,10 +15,10 @@ El workflow `.github/workflows/pages.yml` publica exclusivamente los recursos es
 3. **Dos Focos y Arquitectura Causal** — Comparativa F1↔F2, Mapa Estratégico (6 niveles), Árboles de Problemas y Objetivos, Teoría del Cambio, 6 Indicadores y 6 Riesgos.
 4. **PND (7 Ejes) y Biblioteca Documental** — Trazabilidad de los 7 ejes del PND, las 4 hojas comparables preservadas (*PND, Plan Chocó Renace, Discursos Ministra, Plan Destrabe*), acervo original y carga documental ampliable.
 5. **Análisis de Oportunidades** — Recomendaciones estructurales R1–R6 y matriz de oportunidades PND–ANI convertible en borradores PEI.
-6. **Cartera PEI y Priorización** — Contrato de 6 columnas, Doble Llave F1↔F2, scoring multicriterio 1–5 (9 criterios), mapa cartesiano y 4 cuadrantes Impacto–Esfuerzo, ranking y cronómetro de taller 20 min.
-7. **Plan de Acción 2027–2030** — Desagregación operativa por proyecto PEI, indicadores de gestión, metas anuales 2027–2030, responsables y cronograma plurianual.
-8. **Centro Audiovisual y Recursos** — Sala de 2 reproductores HTML5 institucionales (con streaming HTTP `206 Range` y autodetección en `assets/media/`), galería de láminas/mapas estratégicos con visor ampliable (*lightbox*), previsualización local inmediata y `03_Canvas_2_Focos_ANI.html` embebido.
-9. **Agente Estratégico IA y Consulta** — Integración exclusiva con Arena API (`https://api.arena.ai`, autodetección de modelos vía `/v1/models`, `X-Arena-Trace-ID` y verificación estricta de citas `[ID]`), buscador documental BM25 en español y auditor automático R1–R6.
+6. **Cartera PEI y Priorización** — Contrato obligatorio de 6 columnas (`Foco | Objetivo Estratégico | Proyecto | Unidad de medida | Meta 2030 | Detalle`), emparejamiento recíproco Doble Llave F1↔F2, scoring multicriterio 1–5 (9 criterios), mapa cartesiano Impacto–Esfuerzo, ranking y cronómetro de taller 20 min.
+7. **Plan de Acción 2027–2030** — Contrato obligatorio de 7 columnas (`Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle`), sincronización automática en cascada con Cartera PEI, cronograma plurianual 2027–2030, matriz de correspondencia PEI ↔ PA y exportación/importación CSV.
+8. **Centro Audiovisual y Recursos** — Sala de 2 reproductores HTML5 institucionales (con streaming HTTP `206 Range`, control de velocidad y autodetección en `assets/media/` y `assets/`), galería de láminas/mapas estratégicos con visor ampliable (*lightbox*), previsualización local inmediata y `03_Canvas_2_Focos_ANI.html` embebido.
+9. **Agente Estratégico IA y Consulta** — Integración exclusiva con Arena API (`https://api.arena.ai`, autodetección de modelos vía `/v1/models`, `X-Arena-Trace-ID`, verificación estricta de citas `[ID]` y borradores IA no aprobados), buscador documental BM25 en español, auditor automático R1–R6 + PEI↔PA y panel de Diagnóstico Técnico en vivo (`/api/agent/diagnostics`).
 
 ## 🎬 Carga de videos e imágenes institucionales
 

@@ -267,66 +267,67 @@ export class KnowledgeEngine {
       }
     }
 
-    // Indexar automáticamente documentos ampliados en /knowledge
-    const knowledgeDir = path.join(this.repoRoot, 'knowledge');
-    try {
-      const entries = await fs.readdir(knowledgeDir, { withFileTypes: true });
-      for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-        if (!entry.isFile() || entry.name.startsWith('.')) continue;
-        const ext = path.extname(entry.name).toLowerCase();
-        if (!['.md', '.txt', '.csv', '.json'].includes(ext)) continue;
-        const relPath = path.posix.join('knowledge', entry.name);
-        const fullPath = path.join(knowledgeDir, entry.name);
-        const raw = await fs.readFile(fullPath, 'utf8');
-        const stat = await fs.stat(fullPath);
-        if (!raw.trim()) continue;
+    // 5. Indexar automáticamente cualquier documento institucional en knowledge/ y data/ (sin tocar módulos .js)
+    for (const [subDir, originLabel] of [['knowledge', 'carpeta_knowledge'], ['data', 'carpeta_data']]) {
+      const targetDir = path.join(this.repoRoot, subDir);
+      try {
+        const entries = await fs.readdir(targetDir, { withFileTypes: true });
+        for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+          if (!entry.isFile() || entry.name.startsWith('.')) continue;
+          const ext = path.extname(entry.name).toLowerCase();
+          if (!['.md', '.txt', '.csv', '.json', '.html'].includes(ext)) continue;
+          const relPath = `${subDir}/${entry.name}`;
+          const fullPath = path.join(targetDir, entry.name);
+          const raw = await fs.readFile(fullPath, 'utf8');
+          const stat = await fs.stat(fullPath);
+          if (!raw.trim()) continue;
 
-        const baseName = path.basename(entry.name, ext);
-        const prefix = `DOC-${slugifyId(baseName)}`;
-        let added = [];
+          const baseName = path.basename(entry.name, ext);
+          const prefix = `DOC-${slugifyId(baseName)}`;
+          let added = [];
 
-        if (ext === '.md') {
-          added = parseMarkdownSections(raw, {
-            docPrefix: prefix,
-            sourceFile: relPath,
-            docTitle: baseName.replace(/[_-]+/g, ' '),
-            authorityStatus: 'documento_ampliado',
-            baseTags: ['Acervo Ampliado']
-          });
-        } else {
-          // Partir textos largos en bloques de ~2200 caracteres
-          const maxLen = 2200;
-          const text = ext === '.json' ? raw.slice(0, 20000) : raw;
-          let part = 1;
-          for (let i = 0; i < text.length; i += maxLen) {
-            const slice = text.slice(i, i + maxLen).trim();
-            if (!slice) continue;
-            added.push({
-              id: `${prefix}-P${part}`,
-              docTitle: baseName.replace(/[_-]+/g, ' '),
-              section: `Fragmento ${part}`,
+          if (ext === '.md') {
+            added = parseMarkdownSections(raw, {
+              docPrefix: prefix,
               sourceFile: relPath,
-              lineRange: `Bloque ${part}`,
+              docTitle: baseName.replace(/[_-]+/g, ' '),
               authorityStatus: 'documento_ampliado',
-              level: 2,
-              tags: ['Acervo Ampliado'],
-              content: slice
+              baseTags: ['Acervo Ampliado']
             });
-            part += 1;
+          } else {
+            const maxLen = 2200;
+            const text = ext === '.json' ? raw.slice(0, 20000) : raw;
+            let part = 1;
+            for (let i = 0; i < text.length; i += maxLen) {
+              const slice = text.slice(i, i + maxLen).trim();
+              if (!slice) continue;
+              added.push({
+                id: `${prefix}-P${part}`,
+                docTitle: baseName.replace(/[_-]+/g, ' '),
+                section: `Fragmento ${part}`,
+                sourceFile: relPath,
+                lineRange: `Bloque ${part}`,
+                authorityStatus: 'documento_ampliado',
+                level: 2,
+                tags: ['Acervo Ampliado'],
+                content: slice
+              });
+              part += 1;
+            }
           }
+          chunks.push(...added);
+          filesMeta.push({
+            file: relPath,
+            title: baseName.replace(/[_-]+/g, ' '),
+            authorityStatus: 'documento_ampliado',
+            sizeBytes: stat.size,
+            chunkCount: added.length,
+            origin: originLabel
+          });
         }
-        chunks.push(...added);
-        filesMeta.push({
-          file: relPath,
-          title: baseName.replace(/[_-]+/g, ' '),
-          authorityStatus: 'documento_ampliado',
-          sizeBytes: stat.size,
-          chunkCount: added.length,
-          origin: 'carpeta_knowledge'
-        });
+      } catch {
+        // Carpeta opcional
       }
-    } catch {
-      // Carpeta knowledge opcional
     }
 
     this.repoChunks = chunks;
@@ -503,10 +504,10 @@ export class KnowledgeEngine {
       });
     }
 
-    // 7. Plan de Acción
+    // 7. Plan de Acción (7 columnas obligatorias + cronograma plurianual)
     if (Array.isArray(workspace.actionPlan) && workspace.actionPlan.length) {
       const paLines = workspace.actionPlan.slice(0, 60).map((a, i) =>
-        `${i + 1}. [${a.foco || '—'}] Actividad: "${a.actividad || 'Sin nombre'}" | Proyecto PEI: ${a.proyectoNombre || a.proyectoId || 'Sin vincular'} | Entregable: ${a.entregable || '—'} | Indicador: ${a.indicador || '—'} (${a.unidad || '—'}) | Metas 2027-2030: ${a.m2027 || '—'}/${a.m2028 || '—'}/${a.m2029 || '—'}/${a.m2030 || '—'} | Responsable: ${a.responsable || '—'} | Recursos: ${a.presupuesto || 'Por definir'} | Estado: ${a.estado || 'Formulada'}`
+        `${i + 1}. [${a.foco || '—'}] Objetivo: ${a.objetivo || 'Pendiente'} | Proyecto: ${a.proyectoNombre || a.proyectoId || 'Sin vincular'} | Actividad: "${a.actividad || 'Sin nombre'}" | Meta 2027: ${a.m2027 || 'Por definir'} | Unidad: ${a.unidad || '—'} | Detalle: ${a.detalle || '—'} | Entregable: ${a.entregable || '—'} | Indicador: ${a.indicador || '—'} | Metas 2028-2030: ${a.m2028 || '—'}/${a.m2029 || '—'}/${a.m2030 || '—'} | Responsable: ${a.responsable || '—'} | Estado: ${a.estado || 'Formulada'} (${a.avance ?? 0}%)`
       );
       extra.push({
         id: 'SESION-PLAN-ACCION',
@@ -772,15 +773,74 @@ export class KnowledgeEngine {
       }
     }
 
-    // Actividades huérfanas en Plan de Acción
+    // Validación contractual y correspondencia PEI ↔ Plan de Acción (7 columnas obligatorias)
     const orphanActions = actionPlan.filter((a) => !a.proyectoId && !a.proyectoNombre?.trim());
     if (orphanActions.length > 0) {
       findings.push({
         severity: 'warn',
-        rule: 'Trazabilidad PA',
+        rule: 'Correspondencia PEI ↔ PA',
         citation: 'MARCO-S4',
-        title: `${orphanActions.length} actividad(es) del Plan de Acción sin proyecto PEI vinculado`,
-        detail: 'Toda actividad del Plan de Acción debe responder a un proyecto estratégico del PEI y a un Foco (F1 o F2).'
+        title: `${orphanActions.length} actividad(es) del Plan de Acción sin Proyecto PEI vinculado`,
+        detail: 'Toda actividad del Plan de Acción debe corresponder a un Proyecto del PEI 2027–2030 y heredar su Foco y Objetivo Estratégico.'
+      });
+    }
+
+    actionPlan.forEach((a, idx) => {
+      const aLabel = a.actividad?.trim() || `Actividad PA #${idx + 1}`;
+      const missingPa = [];
+      if (!['F1', 'F2'].includes(a.foco)) missingPa.push('Foco');
+      if (!a.objetivo?.trim()) missingPa.push('Objetivo Estratégico');
+      if (!a.proyectoNombre?.trim()) missingPa.push('Proyecto');
+      if (!a.actividad?.trim()) missingPa.push('Actividad');
+      if (!a.m2027?.trim()) missingPa.push('Meta 2027');
+      if (!a.unidad?.trim()) missingPa.push('Unidad de medida');
+      if (!a.detalle?.trim()) missingPa.push('Detalle');
+
+      if (missingPa.length > 0) {
+        findings.push({
+          severity: 'warn',
+          rule: '7 Columnas Plan de Acción',
+          citation: 'MARCO-S3.7',
+          title: `"${aLabel}" tiene campos obligatorios pendientes en Plan de Acción`,
+          detail: `Complete la estructura obligatoria (Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle). Pendiente: ${missingPa.join(', ')}.`
+        });
+      }
+
+      const parent = a.proyectoId
+        ? projects.find((p) => p.id === a.proyectoId)
+        : (a.proyectoNombre?.trim()
+            ? projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === a.proyectoNombre.trim().toLowerCase())
+            : null);
+      if (parent && parent.foco && a.foco && parent.foco !== a.foco) {
+        findings.push({
+          severity: 'bad',
+          rule: 'Correspondencia Foco PEI ↔ PA',
+          citation: 'MARCO-S5.1',
+          title: `Inconsistencia de Foco en "${aLabel}" (${a.foco} vs Proyecto PEI ${parent.foco})`,
+          detail: `La actividad está asociada al proyecto "${parent.proyecto}" (${parent.foco}), pero registra foco ${a.foco}. Alinee ambos focos.`
+        });
+      }
+
+      const numMeta27 = /\d/.test(a.m2027 || '') && !/por definir|pendiente|insuficiente|por validar/i.test(a.m2027 || '');
+      const noBase27 = !a.lineaBase?.trim() || /pendiente|insuficiente|por definir/i.test(a.lineaBase || '');
+      if (numMeta27 && noBase27) {
+        findings.push({
+          severity: 'warn',
+          rule: 'R6 · Meta 2027 y Línea Base',
+          citation: 'MARCO-S3.6',
+          title: `"${aLabel}" registra Meta 2027 numérica sin línea base verificada`,
+          detail: 'Documente la línea base oficial o registre "Por definir — línea base pendiente" en Meta 2027.'
+        });
+      }
+    });
+
+    if (projects.length > 0 && findings.filter((f) => f.severity === 'bad').length === 0) {
+      findings.push({
+        severity: 'ok',
+        rule: 'Integridad PEI ↔ PA',
+        citation: 'MARCO-S5.4',
+        title: 'Cartera sin hallazgos críticos de estructura, línea base ni doble llave',
+        detail: 'Las reglas críticas R1, R3, R6 y la coherencia de Foco PEI ↔ Plan de Acción se cumplen.'
       });
     }
 

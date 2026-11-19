@@ -87,17 +87,20 @@ export function createProject(overrides = {}) {
       if (Number.isFinite(n) && n >= 1 && n <= 5) mergedScores[k] = Math.round(n);
     }
   }
+  const rawFoco = overrides.foco ?? overrides.Foco ?? '';
+  const normFoco = normalizeFoco(rawFoco);
   return {
     id: safeId(overrides.id, 'p'),
-    foco: normalizeFoco(overrides.foco) === 'F2' ? 'F2' : (normalizeFoco(overrides.foco) === 'F1' ? 'F1' : ''),
-    objetivo: String(overrides.objetivo ?? ''),
-    proyecto: String(overrides.proyecto ?? ''),
-    unidad: String(overrides.unidad ?? ''),
-    meta: String(overrides.meta ?? ''),
-    detalle: String(overrides.detalle ?? ''),
-    doble: String(overrides.doble ?? ''),
-    lineaBase: String(overrides.lineaBase ?? ''),
-    ejePnd: String(overrides.ejePnd ?? ''),
+    foco: normFoco === 'F2' ? 'F2' : (normFoco === 'F1' ? 'F1' : ''),
+    objetivo: String(overrides.objetivo ?? overrides.objetivo_estrategico ?? overrides['Objetivo Estratégico'] ?? ''),
+    proyecto: String(overrides.proyecto ?? overrides.Proyecto ?? overrides.nombre ?? ''),
+    unidad: String(overrides.unidad ?? overrides.unidad_medida ?? overrides['Unidad de medida'] ?? ''),
+    meta: String(overrides.meta ?? overrides.meta_2030 ?? overrides['Meta 2030'] ?? ''),
+    detalle: String(overrides.detalle ?? overrides.Detalle ?? overrides.descripcion ?? ''),
+    doble: String(overrides.doble ?? overrides.doble_llave ?? ''),
+    dobleProyectoId: String(overrides.dobleProyectoId ?? overrides.doble_proyecto_id ?? ''),
+    lineaBase: String(overrides.lineaBase ?? overrides.linea_base ?? ''),
+    ejePnd: String(overrides.ejePnd ?? overrides.eje_pnd ?? ''),
     modo: String(overrides.modo ?? ''),
     criterios: Array.isArray(overrides.criterios) ? overrides.criterios.map(String) : [],
     estatus: STATUS_LABELS[overrides.estatus] ? overrides.estatus : 'en_construccion',
@@ -108,48 +111,59 @@ export function createProject(overrides = {}) {
 
 export function createOpportunity(overrides = {}) {
   return {
-    id: overrides.id || uid('opp'),
-    foco: normalizeFoco(overrides.foco) || 'F1',
-    titulo: String(overrides.titulo ?? ''),
-    ejePnd: String(overrides.ejePnd ?? ''),
+    id: safeId(overrides.id, 'opp'),
+    foco: normalizeFoco(overrides.foco ?? overrides.Foco) || 'F1',
+    titulo: String(overrides.titulo ?? overrides.oportunidad ?? ''),
+    ejePnd: String(overrides.ejePnd ?? overrides.eje_pnd ?? ''),
     modo: String(overrides.modo ?? ''),
     competencia: String(overrides.competencia ?? 'Competencia directa'),
     prioridad: String(overrides.prioridad ?? 'Alta'),
     horizonte: String(overrides.horizonte ?? 'Corto (2027)'),
-    descripcion: String(overrides.descripcion ?? ''),
-    evidencia: String(overrides.evidencia ?? ''),
+    descripcion: String(overrides.descripcion ?? overrides.detalle ?? ''),
+    evidencia: String(overrides.evidencia ?? overrides.fuente ?? ''),
     estatus: STATUS_LABELS[overrides.estatus] ? overrides.estatus : 'en_construccion'
   };
 }
 
+/**
+ * Crea una fila del Plan de Acción preservando la estructura contractual obligatoria:
+ * Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle
+ * más el despliegue plurianual 2028–2030 y seguimiento operativo.
+ */
 export function createActionItem(overrides = {}) {
+  const rawFoco = overrides.foco ?? overrides.Foco ?? '';
+  const normFoco = normalizeFoco(rawFoco);
   return {
-    id: overrides.id || uid('pa'),
+    id: safeId(overrides.id, 'pa'),
     codigo: String(overrides.codigo ?? ''),
-    proyectoId: String(overrides.proyectoId ?? ''),
-    proyectoNombre: String(overrides.proyectoNombre ?? ''),
-    foco: normalizeFoco(overrides.foco) === 'F2' ? 'F2' : (normalizeFoco(overrides.foco) === 'F1' ? 'F1' : ''),
-    actividad: String(overrides.actividad ?? ''),
+    // 7 columnas contractuales obligatorias del Plan de Acción:
+    foco: normFoco === 'F2' ? 'F2' : (normFoco === 'F1' ? 'F1' : ''),
+    objetivo: String(overrides.objetivo ?? overrides.objetivo_estrategico ?? overrides['Objetivo Estratégico'] ?? ''),
+    proyectoId: String(overrides.proyectoId ?? overrides.proyecto_id ?? ''),
+    proyectoNombre: String(overrides.proyectoNombre ?? overrides.proyecto ?? overrides.Proyecto ?? ''),
+    actividad: String(overrides.actividad ?? overrides.Actividad ?? ''),
+    m2027: String(overrides.m2027 ?? overrides.meta2027 ?? overrides.meta_2027 ?? overrides['Meta 2027'] ?? ''),
+    unidad: String(overrides.unidad ?? overrides.unidad_medida ?? overrides['Unidad de medida'] ?? ''),
+    detalle: String(overrides.detalle ?? overrides.Detalle ?? overrides.observaciones ?? ''),
+    // Campos complementarios de programación plurianual y seguimiento:
     entregable: String(overrides.entregable ?? ''),
     indicador: String(overrides.indicador ?? ''),
-    unidad: String(overrides.unidad ?? ''),
-    lineaBase: String(overrides.lineaBase ?? 'Información insuficiente para concluir'),
-    m2027: String(overrides.m2027 ?? ''),
-    m2028: String(overrides.m2028 ?? ''),
-    m2029: String(overrides.m2029 ?? ''),
-    m2030: String(overrides.m2030 ?? ''),
+    lineaBase: String(overrides.lineaBase ?? overrides.linea_base ?? 'Información insuficiente para concluir'),
+    m2028: String(overrides.m2028 ?? overrides.meta_2028 ?? ''),
+    m2029: String(overrides.m2029 ?? overrides.meta_2029 ?? ''),
+    m2030: String(overrides.m2030 ?? overrides.meta_2030 ?? ''),
     responsable: String(overrides.responsable ?? ''),
     presupuesto: String(overrides.presupuesto ?? 'Por definir — restricción presupuestal pendiente'),
-    riesgo: String(overrides.riesgo ?? ''),
+    riesgo: String(overrides.riesgo ?? overrides.riesgos ?? ''),
     estado: String(overrides.estado ?? 'Formulada'),
-    avance: Math.min(100, Math.max(0, Number(overrides.avance) || 0)),
+    avance: Math.min(100, Math.max(0, Number(overrides.avance ?? overrides.avance_pct) || 0)),
     estatus: STATUS_LABELS[overrides.estatus] ? overrides.estatus : 'en_construccion'
   };
 }
 
 export function createMediaItem(overrides = {}) {
   return {
-    id: overrides.id || uid('med'),
+    id: safeId(overrides.id, 'med'),
     tipo: overrides.tipo === 'imagen' ? 'imagen' : 'video',
     titulo: String(overrides.titulo ?? ''),
     url: String(overrides.url ?? ''),
@@ -226,9 +240,12 @@ export function migrateState(raw) {
     }
   }
 
-  // Preservar todos los proyectos PEI originales + normalizar foco
-  if (Array.isArray(raw.projects)) {
-    base.projects = raw.projects.map((p) => createProject(p));
+  // Preservar todos los proyectos PEI originales + normalizar foco (acepta formato web y Streamlit)
+  const rawProjects = Array.isArray(raw.projects)
+    ? raw.projects
+    : (Array.isArray(raw.pei) ? raw.pei : (Array.isArray(raw.proyectos_pei) ? raw.proyectos_pei : null));
+  if (rawProjects) {
+    base.projects = rawProjects.map((p) => createProject(p));
   }
 
   base.updatedAt = raw.updatedAt || null;
@@ -268,10 +285,30 @@ export function migrateState(raw) {
     });
   }
 
-  if (Array.isArray(raw.customDocs)) base.customDocs = raw.customDocs;
-  if (Array.isArray(raw.opportunities)) base.opportunities = raw.opportunities.map((o) => createOpportunity(o));
-  if (Array.isArray(raw.actionPlan)) base.actionPlan = raw.actionPlan.map((a) => createActionItem(a));
-  if (Array.isArray(raw.mediaAssets)) base.mediaAssets = raw.mediaAssets.map((m) => createMediaItem(m));
+  const rawCustomDocs = Array.isArray(raw.customDocs) ? raw.customDocs : (Array.isArray(raw.documentos_adicionales) ? raw.documentos_adicionales : null);
+  if (rawCustomDocs) base.customDocs = rawCustomDocs;
+  const rawOpps = Array.isArray(raw.opportunities) ? raw.opportunities : (Array.isArray(raw.oportunidades) ? raw.oportunidades : null);
+  if (rawOpps) base.opportunities = rawOpps.map((o) => createOpportunity(o));
+  const rawPa = Array.isArray(raw.actionPlan)
+    ? raw.actionPlan
+    : (Array.isArray(raw.plan_accion) ? raw.plan_accion : (Array.isArray(raw.plan_de_accion) ? raw.plan_de_accion : null));
+  if (rawPa) {
+    base.actionPlan = rawPa.map((a) => {
+      const item = createActionItem(a);
+      // Reconciliar correspondencia con proyecto PEI (por id o nombre) sin sobrescribir datos explícitos
+      const parent = (item.proyectoId && base.projects.find((p) => p.id === item.proyectoId))
+        || (item.proyectoNombre && base.projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === item.proyectoNombre.trim().toLowerCase()));
+      if (parent) {
+        if (!item.proyectoId) item.proyectoId = parent.id;
+        if (!item.proyectoNombre.trim()) item.proyectoNombre = parent.proyecto;
+        if (!item.foco && parent.foco) item.foco = parent.foco;
+        if (!item.objetivo.trim() && parent.objetivo.trim()) item.objetivo = parent.objetivo;
+      }
+      return item;
+    });
+  }
+  const rawMedia = Array.isArray(raw.mediaAssets) ? raw.mediaAssets : (Array.isArray(raw.recursos_media) ? raw.recursos_media : null);
+  if (rawMedia) base.mediaAssets = rawMedia.map((m) => createMediaItem(m));
   if (raw.mediaSlots && typeof raw.mediaSlots === 'object') {
     const cleanSlots = {};
     for (const [k, v] of Object.entries(raw.mediaSlots)) {
@@ -384,26 +421,152 @@ export function projCategory(p) {
   return { key: 'q4', label: 'Transformación estructural', cls: 'badge-amber' };
 }
 
+/**
+ * Valida las 7 columnas obligatorias del Plan de Acción:
+ * Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle
+ */
+export function paValid(a) {
+  return Boolean(
+    a &&
+    (a.foco === 'F1' || a.foco === 'F2') &&
+    String(a.objetivo || '').trim() &&
+    String(a.proyectoNombre || '').trim() &&
+    String(a.actividad || '').trim() &&
+    String(a.m2027 || '').trim() &&
+    String(a.unidad || '').trim() &&
+    String(a.detalle || '').trim()
+  );
+}
+
+export function paHasBaselineIssue(a) {
+  const hasNumMeta = /\d/.test(a?.m2027 || '') && !/por definir|pendiente|insuficiente|por validar/i.test(a?.m2027 || '');
+  const lacksBase = !a?.lineaBase?.trim() || /pendiente|insuficiente|por definir/i.test(a?.lineaBase || '');
+  return hasNumMeta && lacksBase;
+}
+
+export function paChecklist(a, projects = []) {
+  const parent = a?.proyectoId ? projects.find((p) => p.id === a.proyectoId) : null;
+  const coherentFoco = parent ? (!parent.foco || parent.foco === a.foco) : (a.foco === 'F1' || a.foco === 'F2');
+  return [
+    ['1. Foco (F1/F2)', (a.foco === 'F1' || a.foco === 'F2') && coherentFoco],
+    ['2. Objetivo Estratégico', Boolean(String(a.objetivo || '').trim())],
+    ['3. Proyecto PEI vinculado', Boolean(String(a.proyectoNombre || '').trim() && (parent || !projects.length))],
+    ['4. Actividad definida', Boolean(String(a.actividad || '').trim())],
+    ['5. Meta 2027 coherente', Boolean(String(a.m2027 || '').trim()) && !paHasBaselineIssue(a)],
+    ['6. Unidad de medida', Boolean(String(a.unidad || '').trim())],
+    ['7. Detalle técnico', Boolean(String(a.detalle || '').trim())]
+  ];
+}
+
+/**
+ * Mantiene la correspondencia viva entre un proyecto PEI y sus actividades del Plan de Acción
+ */
+export function syncActionPlanWithProject(state, project) {
+  if (!state?.actionPlan || !project?.id) return 0;
+  let updated = 0;
+  for (const a of state.actionPlan) {
+    if (a.proyectoId === project.id) {
+      if (project.foco) a.foco = project.foco;
+      if (project.proyecto?.trim()) a.proyectoNombre = project.proyecto;
+      if (project.objetivo?.trim()) a.objetivo = project.objetivo;
+      updated += 1;
+    }
+  }
+  // Sincronizar etiqueta de Doble Llave en proyectos emparejados
+  for (const p of state.projects || []) {
+    if (p.dobleProyectoId === project.id && project.proyecto?.trim()) {
+      p.doble = `[${project.foco || 'F1/F2'}] ${project.proyecto}`;
+    }
+  }
+  return updated;
+}
+
+/**
+ * Calcula correspondencia integral PEI 2027–2030 ↔ Plan de Acción y articulación Doble Llave F1↔F2
+ */
+export function computeCorrespondence(state) {
+  const projects = state.projects || [];
+  const actions = state.actionPlan || [];
+  const byProject = new Map();
+  projects.forEach((p) => byProject.set(p.id, []));
+
+  const orphanActions = [];
+  const focoMismatches = [];
+
+  for (const a of actions) {
+    const parent = (a.proyectoId && projects.find((p) => p.id === a.proyectoId))
+      || (a.proyectoNombre && projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === a.proyectoNombre.trim().toLowerCase()));
+    if (parent) {
+      byProject.get(parent.id)?.push(a);
+      if (parent.foco && a.foco && parent.foco !== a.foco) {
+        focoMismatches.push({ action: a, project: parent });
+      }
+    } else {
+      orphanActions.push(a);
+    }
+  }
+
+  const projectRows = projects.map((p) => {
+    const linkedActions = byProject.get(p.id) || [];
+    const partner = p.dobleProyectoId ? projects.find((x) => x.id === p.dobleProyectoId) : null;
+    const hasDoubleKey = Boolean(partner || (p.doble && p.doble.trim().length >= 5));
+    const avgAvance = linkedActions.length
+      ? Math.round(linkedActions.reduce((s, x) => s + (Number(x.avance) || 0), 0) / linkedActions.length)
+      : 0;
+    return {
+      project: p,
+      linkedActions,
+      partner,
+      hasDoubleKey,
+      hasPa: linkedActions.length > 0,
+      validPaCount: linkedActions.filter(paValid).length,
+      avgAvance
+    };
+  });
+
+  const coveredProjects = projectRows.filter((r) => r.hasPa).length;
+  const uncoveredProjects = projectRows.filter((r) => !r.hasPa).map((r) => r.project);
+  const doubleKeyProjects = projectRows.filter((r) => r.hasDoubleKey).length;
+  const hasF1 = projects.some((p) => p.foco === 'F1');
+  const hasF2 = projects.some((p) => p.foco === 'F2');
+
+  return {
+    projectRows,
+    coveredProjects,
+    uncoveredProjects,
+    orphanActions,
+    focoMismatches,
+    doubleKeyProjects,
+    balancedFocos: hasF1 && hasF2,
+    coveragePct: projects.length ? Math.round((coveredProjects / projects.length) * 100) : 0,
+    doubleKeyPct: projects.length ? Math.round((doubleKeyProjects / projects.length) * 100) : 0
+  };
+}
+
 export function computeMetrics(state) {
   const docsDone = BASE_DOC_SHEETS.filter((d) => docComplete(state.docs[d.id])).length;
   const axesDone = state.pndAxes.filter(pndAxisComplete).length;
   const projTotal = state.projects.length;
   const projF1 = state.projects.filter((p) => p.foco === 'F1').length;
   const projF2 = state.projects.filter((p) => p.foco === 'F2').length;
-  const projOk = state.projects.filter(projValid).length;
-  const projDoble = state.projects.filter((p) => p.doble.trim()).length;
+  const projOk = state.projects.filter((p) => projValid(p) && !projHasBaselineIssue(p)).length;
+  const projDoble = state.projects.filter((p) => p.doble.trim() || p.dobleProyectoId).length;
   const paTotal = state.actionPlan.length;
+  const paF1 = state.actionPlan.filter((a) => a.foco === 'F1').length;
+  const paF2 = state.actionPlan.filter((a) => a.foco === 'F2').length;
+  const paOk = state.actionPlan.filter((a) => paValid(a) && !paHasBaselineIssue(a)).length;
+  const corr = computeCorrespondence(state);
   const oppTotal = state.opportunities.length;
   const identityDone = (state.identity.mision.trim() ? 1 : 0) + (state.identity.vision.trim() ? 1 : 0) + (state.identity.objetivos.length > 0 ? 1 : 0);
 
-  // Ponderación integral de avance estratégico
+  // Ponderación integral de avance estratégico (incluye validez 7 col. PA y correspondencia PEI↔PA)
   const docRatio = docsDone / 4;
   const axesRatio = axesDone / 7;
   const idRatio = identityDone / 3;
   const peiRatio = projTotal ? projOk / projTotal : 0;
   const dobleRatio = projTotal ? projDoble / projTotal : 0;
-  const paRatio = paTotal > 0 ? 1 : 0;
-  const pct = Math.round((docRatio * 0.22 + axesRatio * 0.18 + idRatio * 0.12 + peiRatio * 0.24 + dobleRatio * 0.12 + paRatio * 0.12) * 100);
+  const paRatio = paTotal ? (0.5 * (paOk / paTotal) + 0.5 * (projTotal ? corr.coveredProjects / projTotal : 1)) : 0;
+  const pct = Math.round((docRatio * 0.20 + axesRatio * 0.16 + idRatio * 0.12 + peiRatio * 0.24 + dobleRatio * 0.12 + paRatio * 0.16) * 100);
 
   return {
     docsDone,
@@ -414,6 +577,12 @@ export function computeMetrics(state) {
     projOk,
     projDoble,
     paTotal,
+    paF1,
+    paF2,
+    paOk,
+    peiCovered: corr.coveredProjects,
+    paOrphans: corr.orphanActions.length,
+    balancedFocos: corr.balancedFocos,
     oppTotal,
     identityDone,
     totalLibraryDocs: 4 + BASE_DOC_SHEETS.length + state.customDocs.length,
@@ -474,31 +643,75 @@ export function buildPeiCsv(projects) {
   return buildCsv(head, rows);
 }
 
+/**
+ * Exporta el Plan de Acción iniciando con las 7 columnas obligatorias exactas:
+ * Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle
+ * seguidas por las columnas de programación plurianual 2028–2030 y trazabilidad operativa.
+ */
 export function buildActionPlanCsv(actionPlan) {
   const head = [
-    'CÓDIGO', 'FOCO', 'PROYECTO PEI ASOCIADO', 'ACTIVIDAD', 'ENTREGABLE',
-    'INDICADOR DE GESTIÓN', 'UNIDAD', 'LÍNEA BASE',
-    'META 2027', 'META 2028', 'META 2029', 'META 2030',
-    'RESPONSABLE', 'PRESUPUESTO / RECURSOS', 'RIESGO', 'ESTADO', 'AVANCE %', 'ESTATUS'
+    'FOCO',
+    'OBJETIVO ESTRATÉGICO',
+    'PROYECTO',
+    'ACTIVIDAD',
+    'META 2027',
+    'UNIDAD DE MEDIDA',
+    'DETALLE',
+    'CÓDIGO',
+    'ENTREGABLE',
+    'INDICADOR DE GESTIÓN',
+    'LÍNEA BASE',
+    'META 2028',
+    'META 2029',
+    'META 2030',
+    'RESPONSABLE',
+    'PRESUPUESTO / RECURSOS',
+    'RIESGO',
+    'ESTADO',
+    'AVANCE %',
+    'VALIDACIÓN (OK / Por definir)',
+    'ESTATUS'
   ];
-  const rows = actionPlan.map((a, idx) => [
-    a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`,
-    a.foco,
-    a.proyectoNombre,
-    a.actividad,
-    a.entregable,
-    a.indicador,
-    a.unidad,
-    a.lineaBase,
-    a.m2027, a.m2028, a.m2029, a.m2030,
-    a.responsable,
-    a.presupuesto,
-    a.riesgo,
-    a.estado,
-    a.avance,
-    STATUS_LABELS[a.estatus]?.label || a.estatus
-  ]);
+  const rows = actionPlan.map((a, idx) => {
+    const valid = paValid(a) && !paHasBaselineIssue(a) ? 'OK' : 'Por definir';
+    return [
+      a.foco,
+      a.objetivo,
+      a.proyectoNombre,
+      a.actividad,
+      a.m2027,
+      a.unidad,
+      a.detalle,
+      a.codigo || `PA-${String(idx + 1).padStart(2, '0')}`,
+      a.entregable,
+      a.indicador,
+      a.lineaBase,
+      a.m2028,
+      a.m2029,
+      a.m2030,
+      a.responsable,
+      a.presupuesto,
+      a.riesgo,
+      a.estado,
+      a.avance,
+      valid,
+      STATUS_LABELS[a.estatus]?.label || a.estatus
+    ];
+  });
   return buildCsv(head, rows);
+}
+
+export function buildActionPlanTemplateCsv() {
+  const head = [
+    'FOCO',
+    'OBJETIVO ESTRATÉGICO',
+    'PROYECTO',
+    'ACTIVIDAD',
+    'META 2027',
+    'UNIDAD DE MEDIDA',
+    'DETALLE'
+  ];
+  return buildCsv(head, []);
 }
 
 export function parseCsvRows(text) {
@@ -579,35 +792,70 @@ export function importPeiFromCsv(csvText) {
 export function importActionPlanFromCsv(csvText, projects = []) {
   const rows = parseCsvRows(csvText);
   if (rows.length < 2) return [];
+  const normH = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const header = rows[0].map(normH);
   const dataRows = rows.slice(1);
+
+  // Detectar formato legado (CÓDIGO en columna 0) vs formato contractual obligatorio (FOCO | OBJETIVO ESTRATÉGICO | PROYECTO | ACTIVIDAD | META 2027 | UNIDAD DE MEDIDA | DETALLE)
+  const isLegacy = header[0] === 'codigo';
+  const findCol = (...patterns) => header.findIndex((h) => patterns.some((rx) => rx.test(h)));
+
+  const idxFoco = isLegacy ? 1 : Math.max(0, findCol(/^foco/));
+  const idxObj = isLegacy ? -1 : findCol(/objetivo/);
+  const idxProj = isLegacy ? 2 : findCol(/^proyecto/);
+  const idxAct = isLegacy ? 3 : findCol(/^actividad/);
+  const idxM2027 = isLegacy ? 8 : findCol(/meta\s*2027/);
+  const idxUnidad = isLegacy ? 6 : findCol(/^unidad/);
+  const idxDetalle = isLegacy ? -1 : findCol(/^detalle|observacion/);
+  const idxCodigo = isLegacy ? 0 : findCol(/^codigo/);
+  const idxEnt = isLegacy ? 4 : findCol(/^entregable/);
+  const idxInd = isLegacy ? 5 : findCol(/^indicador/);
+  const idxLb = isLegacy ? 7 : findCol(/linea\s*base/);
+  const idxM2028 = isLegacy ? 9 : findCol(/meta\s*2028/);
+  const idxM2029 = isLegacy ? 10 : findCol(/meta\s*2029/);
+  const idxM2030 = isLegacy ? 11 : findCol(/meta\s*2030/);
+  const idxResp = isLegacy ? 12 : findCol(/^responsable/);
+  const idxPres = isLegacy ? 13 : findCol(/^presupuesto/);
+  const idxRiesgo = isLegacy ? 14 : findCol(/^riesgo/);
+  const idxEstado = isLegacy ? 15 : findCol(/^estado$/);
+  const idxAvance = isLegacy ? 16 : findCol(/^avance/);
+  const idxEstatus = isLegacy ? 17 : findCol(/^estatus/);
+
+  const cellAt = (r, i) => (i >= 0 && i < r.length ? String(r[i] || '').trim() : '');
+
   return dataRows
-    .filter((r) => (r[1] || r[2] || r[3] || '').trim().length > 0)
+    .filter((r) => (cellAt(r, idxFoco) || cellAt(r, idxProj) || cellAt(r, idxAct)).length > 0)
     .map((r) => {
-      const projLabel = String(r[2] || '').trim();
+      const projLabel = cellAt(r, idxProj);
       const linked = projects.find((p) => p.proyecto && p.proyecto.trim().toLowerCase() === projLabel.toLowerCase());
-      const pct = Math.max(0, Math.min(100, parseInt(r[16], 10) || 0));
-      const statusCol = String(r[17] || '').trim();
+      const pct = Math.max(0, Math.min(100, parseInt(cellAt(r, idxAvance), 10) || 0));
+      const statusCol = cellAt(r, idxEstatus);
       const matchedStatus = statusCol
         ? Object.entries(STATUS_LABELS).find(([k, v]) => k === statusCol || v.label.toLowerCase() === statusCol.toLowerCase())
         : null;
+      const objVal = cellAt(r, idxObj) || linked?.objetivo || '';
+      const lbVal = cellAt(r, idxLb);
+      const presVal = cellAt(r, idxPres);
       return createActionItem({
-        codigo: r[0] || '',
-        foco: normalizeFoco(r[1] || linked?.foco || ''),
+        codigo: cellAt(r, idxCodigo),
+        foco: normalizeFoco(cellAt(r, idxFoco) || linked?.foco || ''),
+        objetivo: objVal,
         proyectoId: linked ? linked.id : '',
         proyectoNombre: linked ? linked.proyecto : projLabel,
-        actividad: r[3] || '',
-        entregable: r[4] || '',
-        indicador: r[5] || '',
-        unidad: r[6] || '',
-        lineaBase: r[7] || '',
-        m2027: r[8] || '',
-        m2028: r[9] || '',
-        m2029: r[10] || '',
-        m2030: r[11] || '',
-        responsable: r[12] || '',
-        presupuesto: r[13] || '',
-        riesgo: r[14] || '',
-        estado: r[15] || 'Formulada',
+        actividad: cellAt(r, idxAct),
+        m2027: cellAt(r, idxM2027),
+        unidad: cellAt(r, idxUnidad),
+        detalle: cellAt(r, idxDetalle),
+        entregable: cellAt(r, idxEnt),
+        indicador: cellAt(r, idxInd),
+        lineaBase: lbVal || 'Información insuficiente para concluir',
+        m2028: cellAt(r, idxM2028),
+        m2029: cellAt(r, idxM2029),
+        m2030: cellAt(r, idxM2030),
+        responsable: cellAt(r, idxResp),
+        presupuesto: presVal || 'Por definir — restricción presupuestal pendiente',
+        riesgo: cellAt(r, idxRiesgo),
+        estado: cellAt(r, idxEstado) || 'Formulada',
         avance: pct,
         estatus: matchedStatus ? matchedStatus[0] : 'en_construccion'
       });

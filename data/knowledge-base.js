@@ -472,12 +472,22 @@ export const SCORING_CRITERIA = [
 ];
 
 export const PEI_FILL_RULES = [
-  { col: 'FOCO (INICIATIVA)', rule: 'Únicamente F1 o F2. Si contribuye a ambos, elegir el foco principal y justificar la articulación en Detalle y Doble Llave.', avoid: 'Dejar vacío o inventar un tercer foco.' },
-  { col: 'OBJETIVOS ESTRATÉGICOS', rule: 'Seleccionar o copiar un objetivo estratégico vigente de la ANI. Mientras no esté cargado, usar "Información insuficiente para concluir".', avoid: 'Redactar objetivos nuevos improvisados en cada fila.' },
-  { col: 'PROYECTO', rule: 'Nombre único, concreto y verificable, indicando modo de transporte (F1) o frente de capacidad/territorio (F2).', avoid: 'Nombres genéricos como "mejorar infraestructura".' },
-  { col: 'UNIDAD MEDIDA', rule: 'Una sola unidad verificable: km, %, casos, proyectos, corredores, índice, etc.', avoid: 'Mezclar varias unidades o escribir "varios".' },
-  { col: 'META 2030', rule: 'Número + unidad + horizonte 2030 únicamente si existe línea base verificada; de lo contrario escribir "Por definir — línea base pendiente".', avoid: 'Fijar metas numéricas sin línea base oficial.' },
-  { col: 'DETALLE', rule: 'Explicar contribución al Foco, cumplimiento de los 6 criterios F1 o 5 capacidades F2, supuestos y riesgos principales.', avoid: 'Texto promocional sin trazabilidad técnica.' }
+  { col: 'Foco', rule: 'Únicamente F1 o F2. Si contribuye a ambos, elegir el foco principal y justificar la articulación en Detalle y Doble Llave.', avoid: 'Dejar vacío o inventar un tercer foco.' },
+  { col: 'Objetivo Estratégico', rule: 'Seleccionar o copiar un objetivo estratégico vigente de la ANI. Mientras no esté cargado, usar "Información insuficiente para concluir".', avoid: 'Redactar objetivos nuevos improvisados en cada fila.' },
+  { col: 'Proyecto', rule: 'Nombre único, concreto y verificable, indicando modo de transporte (F1) o frente de capacidad/territorio (F2).', avoid: 'Nombres genéricos como "mejorar infraestructura".' },
+  { col: 'Unidad de medida', rule: 'Una sola unidad verificable: km, %, casos, proyectos, corredores, índice, etc.', avoid: 'Mezclar varias unidades o escribir "varios".' },
+  { col: 'Meta 2030', rule: 'Número + unidad + horizonte 2030 únicamente si existe línea base verificada; de lo contrario escribir "Por definir — línea base pendiente".', avoid: 'Fijar metas numéricas sin línea base oficial.' },
+  { col: 'Detalle', rule: 'Explicar contribución al Foco, cumplimiento de los 6 criterios F1 o 5 capacidades F2, supuestos y riesgos principales.', avoid: 'Texto promocional sin trazabilidad técnica.' }
+];
+
+export const PA_FILL_RULES = [
+  { col: 'Foco', rule: 'F1 o F2, coherente con el Foco del Proyecto PEI del cual se deriva.', avoid: 'Asignar una actividad a un foco distinto al de su proyecto PEI.' },
+  { col: 'Objetivo Estratégico', rule: 'Hereda y mantiene correspondencia directa con el Objetivo Estratégico del Proyecto PEI asociado (o registra "Información insuficiente para concluir" hasta carga oficial).', avoid: 'Desalinear el objetivo operativo respecto al PEI 2027–2030.' },
+  { col: 'Proyecto', rule: 'Proyecto estratégico de la Cartera PEI 2027–2030 al que materializa esta actividad.', avoid: 'Registrar actividades aisladas sin correspondencia con el PEI.' },
+  { col: 'Actividad', rule: 'Acción operativa concreta, verificable y programable que materializa el Proyecto PEI en la vigencia.', avoid: 'Repetir el nombre del proyecto sin desagregación operativa.' },
+  { col: 'Meta 2027', rule: 'Compromiso anual verificable para 2027 sustentado en línea base; si no existe línea base oficial, escribir "Por definir — línea base pendiente".', avoid: 'Fijar cifras 2027 sin soporte documental ni presupuestal.' },
+  { col: 'Unidad de medida', rule: 'Una sola unidad medible y consistente con la actividad (documentos, km, %, mesas, casos, protocolos, hitos).', avoid: 'Dejar en blanco o mezclar unidades heterogéneas.' },
+  { col: 'Detalle', rule: 'Alcance técnico, entregable verificable, articulación F1↔F2, dependencia responsable, supuestos y mitigación de riesgos.', avoid: 'Descripciones vagas sin producto ni condición de verificación.' }
 ];
 
 export const ILLUSTRATIVE_CSV_EXAMPLES = [

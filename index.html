@@ -77,6 +77,14 @@
                 Importar Respaldo (JSON)
                 <input type="file" accept=".json,application/json" hidden onchange="ANI.importJson(event)">
               </label>
+              <label class="dropdown-item">
+                Importar Cartera PEI (CSV)
+                <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importPeiCsvFile(event)">
+              </label>
+              <label class="dropdown-item">
+                Importar Plan de Acción (CSV)
+                <input type="file" accept=".csv,text/csv" hidden onchange="ANI.importActionCsvFile(event)">
+              </label>
               <button type="button" class="dropdown-item" onclick="ANI.closeDropdowns();window.print()">Imprimir / Guardar PDF</button>
               <div class="dropdown-sep"></div>
               <button type="button" class="dropdown-item danger" onclick="ANI.resetAll()">Reiniciar datos locales</button>

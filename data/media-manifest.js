@@ -54,6 +54,9 @@ export function sanitizeMediaUrl(rawUrl) {
   if (!s) return '';
   if (s.startsWith('blob:')) return s;
   if (/^https:\/\//i.test(s)) return s;
+  if (/^\.?\/?assets\/(?:media\/)?[A-Za-z0-9._% -]+\.(?:mp4|webm|ogg|ogv|mov|m4v|png|jpe?g|webp|svg|gif)$/i.test(s) && !s.includes('..')) {
+    return s.startsWith('./') ? s : s.startsWith('/') ? `.${s}` : `./${s}`;
+  }
   if (/^\.?\/?assets\/media\/[A-Za-z0-9._% -]+$/i.test(s) && !s.includes('..')) {
     return s.startsWith('./') ? s : s.startsWith('/') ? `.${s}` : `./${s}`;
   }
