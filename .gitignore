@@ -16,3 +16,9 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
+
+# Python / artefactos auxiliares locales
+__pycache__/
+*.py[cod]
+*.respaldo*
+*_respaldo_*.py
