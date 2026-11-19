@@ -118,7 +118,7 @@ export function localFallbackSearch(query, workspace = null, topK = 6) {
       lineRange: 'Plan de Acción',
       authorityStatus: 'en_construccion',
       tags: ['Plan de Acción'],
-      content: workspace.actionPlan.map((a) => `[${a.foco || '—'}] ${a.actividad || 'Sin nombre'} → ${a.entregable || '—'} (${a.responsable || '—'})`).join('\n')
+      content: workspace.actionPlan.map((a) => `[${a.foco || '—'}] Objetivo: ${a.objetivo || '—'} | Proyecto: ${a.proyectoNombre || '—'} | Actividad: ${a.actividad || 'Sin nombre'} | Meta 2027: ${a.m2027 || 'Por definir'} | Unidad: ${a.unidad || '—'} | Detalle: ${a.detalle || a.entregable || '—'}`).join('\n')
     });
   }
 
@@ -320,12 +320,34 @@ export async function fetchAgentStatus() {
 }
 
 export async function verifyArenaConnection() {
-  const res = await fetch(apiUrl('/api/agent/verify'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: '{}'
-  });
-  return res.json();
+  try {
+    const res = await fetch(apiUrl('/api/agent/verify'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: '{}'
+    });
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      return {
+        ok: false,
+        verification: {
+          ok: false,
+          status: 'static_host_mode',
+          message: 'Ejecución estática (GitHub Pages): conecte una URL HTTPS de backend o inicie `npm start` con `ARENA_API_KEY` para consultar Arena API en vivo.'
+        }
+      };
+    }
+    return await res.json();
+  } catch {
+    return {
+      ok: false,
+      verification: {
+        ok: false,
+        status: 'offline',
+        message: 'Servidor backend no conectado en este origen. El buscador documental y el auditor R1–R6 continúan activos localmente.'
+      }
+    };
+  }
 }
 
 export async function searchKnowledge(query, workspace, filterTag = '') {
@@ -374,13 +396,26 @@ export async function fetchSystemDiagnostics() {
     const data = await res.json();
     if (data?.ok) return data;
   } catch { /* fallback modo estático */ }
+  let baseDocsOk = false;
+  let canvasOk = false;
+  try {
+    const [mRes, cRes] = await Promise.all([
+      fetch('./01_Marco_Estrategico_ANI_2027-2030.md', { method: 'HEAD' }),
+      fetch('./03_Canvas_2_Focos_ANI.html', { method: 'HEAD' })
+    ]);
+    baseDocsOk = mRes.ok;
+    canvasOk = cRes.ok;
+  } catch { /* sin red */ }
   return {
     ok: true,
     checkedAt: new Date().toISOString(),
     checks: [
-      { id: 'static', name: 'Modo de Ejecución Frontend Estático', status: 'warn', detail: 'Servidor Node no conectado en este origen; BM25 local y auditoría R1–R6 operativos.' },
-      { id: 'contracts', name: 'Contratos Obligatorios PEI (6 col.) y Plan de Acción (7 col.)', status: 'ok', detail: 'Validaciones contractuales y persistencia local activas.' },
-      { id: 'arena_api', name: 'Adaptador Exclusivo Arena API', status: 'warn', detail: 'Requiere iniciar `npm start` con `ARENA_API_KEY` en entorno de servidor.' }
+      { id: 'static', name: 'Ejecución Estática (GitHub Pages)', status: 'info', detail: 'Frontend de 9 módulos activo en modo estático sin exponer claves en el navegador.' },
+      { id: 'base_files', name: 'Integridad de Documentos Públicos ANI', status: baseDocsOk ? 'ok' : 'info', detail: baseDocsOk ? 'Marco Estratégico ANI 2027–2030 accesible para citas verificables en vivo.' : `${STATIC_FALLBACK_CHUNKS.length} fragmentos institucionales cargados en catálogo local.` },
+      { id: 'knowledge', name: 'Buscador Documental y Auditoría R1–R6 Local', status: 'ok', detail: `${STATIC_FALLBACK_CHUNKS.length} secciones base + citas de sesión activas sin requerir backend.` },
+      { id: 'contracts', name: 'Contratos Obligatorios PEI (6 col.) y Plan de Acción (7 col.)', status: 'ok', detail: 'PEI: Foco | Objetivo Estratégico | Proyecto | Unidad de medida | Meta 2030 | Detalle · PA: Foco | Objetivo Estratégico | Proyecto | Actividad | Meta 2027 | Unidad de medida | Detalle' },
+      { id: 'media', name: 'Centro Audiovisual (2 Videos + Galería + Canvas)', status: canvasOk ? 'ok' : 'info', detail: '2 reproductores HTML5 + lightbox + previsualización local y Canvas 2 Focos integrados.' },
+      { id: 'arena_api', name: 'Adaptador Exclusivo Arena API (https://api.arena.ai)', status: 'warn', detail: 'Para IA generativa en vivo, conecte una URL HTTPS del backend (`server/index.mjs` con `ARENA_API_KEY`).' }
     ]
   };
 }
@@ -452,6 +487,10 @@ export async function fetchCitationChunk(chunkId, workspace = null) {
         }
       }
     } catch { /* fallback a catálogo local */ }
+  }
+  if (workspace) {
+    const wsHit = localFallbackSearch('', workspace, 200).find((c) => c.id === chunkId);
+    if (wsHit) return wsHit;
   }
   return STATIC_FALLBACK_CHUNKS.find((c) => c.id === chunkId) || null;
 }
